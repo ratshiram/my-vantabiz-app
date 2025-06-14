@@ -63,6 +63,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             id: firebaseUser.uid,
             email: firebaseUser.email || "",
             name: userData.name || firebaseUser.displayName || "",
+            username: userData.username || "", // Load username
             tier: userData.tier || 'free',
             trialEndDate: trialEndDate,
           });
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             id: firebaseUser.uid,
             email: firebaseUser.email || "",
             name: firebaseUser.displayName || "User",
+            username: "", // Default username if no doc
             tier: 'free', 
             trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default new trial
           });
@@ -110,17 +112,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const firebaseUser = userCredential.user;
       
       const trialEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      const newUser: User = {
-        id: firebaseUser.uid,
-        email: values.email,
-        name: values.name,
-        tier: 'free',
-        trialEndDate: trialEndDate,
-      };
+      // This local User object isn't directly used beyond this point as onAuthStateChanged handles setUser
+      // const newUser: User = {
+      //   id: firebaseUser.uid,
+      //   email: values.email,
+      //   name: values.name,
+      //   username: values.username, // Include username
+      //   tier: 'free',
+      //   trialEndDate: trialEndDate,
+      // };
 
       await setDoc(doc(db, "users", firebaseUser.uid), {
-        email: values.email,
         name: values.name,
+        username: values.username, // Save username
+        email: values.email,
         tier: 'free',
         trialEndDate: Timestamp.fromDate(trialEndDate), // Store as Firestore Timestamp
       });
@@ -157,3 +162,4 @@ export function AuthProvider({ children }: AuthProviderProps) {
     </AuthContext.Provider>
   );
 }
+

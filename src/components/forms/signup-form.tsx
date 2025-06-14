@@ -20,6 +20,7 @@ export function SignupForm() {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       name: "",
+      username: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -50,6 +51,19 @@ export function SignupForm() {
               <Label htmlFor="name">Full Name</Label>
               <FormControl>
                 <Input id="name" placeholder="Your Name" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <FormItem>
+              <Label htmlFor="username">Username</Label>
+              <FormControl>
+                <Input id="username" placeholder="your_username" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -102,3 +116,4 @@ export function SignupForm() {
     </Form>
   );
 }
+
