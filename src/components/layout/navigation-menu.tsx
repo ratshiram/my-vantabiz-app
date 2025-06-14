@@ -4,12 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, FileText, Tags, UserCircle, Home } from 'lucide-react'; // Added Home icon
-
+import { LayoutDashboard, FileText, Tags, UserCircle } from 'lucide-react';
 
 const navItems = [
-  { href: '/', label: 'Home', icon: <Home className="mr-2 h-5 w-5" /> }, // Added Home link for landing page
-  { href: '/dashboard', label: 'FinTrack', icon: <LayoutDashboard className="mr-2 h-5 w-5" /> }, // Updated href
+  { href: '/', label: 'FinTrack', icon: <LayoutDashboard className="mr-2 h-5 w-5" /> },
   { href: '/invoice-generator', label: 'Invoice Gen', icon: <FileText className="mr-2 h-5 w-5" /> },
   { href: '/pricing', label: 'Pricing', icon: <Tags className="mr-2 h-5 w-5" /> },
 ];
