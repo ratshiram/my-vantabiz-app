@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { MainLayout } from '@/components/layout/main-layout'; // Added
+import { MainLayout } from '@/components/layout/main-layout';
+import { AuthProvider } from '@/contexts/auth-context'; // Added AuthProvider
 
 export const metadata: Metadata = {
-  title: 'VantaBiz Suite', // Updated title
-  description: 'Financial Tools for Your Business by VantaBiz', // Updated description
+  title: 'VantaBiz Suite',
+  description: 'Financial Tools for Your Business by VantaBiz',
 };
 
 export default function RootLayout({
@@ -21,9 +22,11 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased min-h-screen flex flex-col bg-background">
-        <MainLayout> {/* Added MainLayout Wrapper */}
-          {children}
-        </MainLayout>
+        <AuthProvider> {/* Wrapped with AuthProvider */}
+          <MainLayout>
+            {children}
+          </MainLayout>
+        </AuthProvider>
         <Toaster />
       </body>
     </html>
