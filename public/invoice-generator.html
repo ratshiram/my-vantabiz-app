@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VantaBiz - Invoice & Receipt Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .receipt-preview { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+        label { font-weight: 500; }
+        input, select { @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-150 ease-in-out; }
+        .btn { @apply inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-opacity; }
+        .btn-primary { @apply bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500; }
+        .btn-success { @apply bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500; }
+        .btn-secondary { @apply bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-400; }
+        .btn:disabled { @apply opacity-50 cursor-not-allowed; }
+        .tax-controls { display: none; }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-12">
+            <a href="#" class="flex justify-center items-center space-x-3">
+                <svg class="h-12 w-12" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="url(#logo-gradient)"/><path d="M11 12L16.6667 28L20.4444 18.2222L29 12L20.4444 15.7778L16.6667 28L14.7778 21.8889L11 19.5556L18.5556 16.6667L11 12Z" fill="white"/><defs><linearGradient id="logo-gradient" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop stop-color="#4F46E5"/><stop offset="1" stop-color="#818CF8"/></linearGradient></defs></svg>
+                <span class="text-4xl font-extrabold text-indigo-600">VantaBiz</span>
+            </a>
+            <p class="text-lg text-gray-600 mt-4">Professional Invoice & Receipt Generator</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <!-- Form Section -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                <form id="receipt-form" class="space-y-6">
+                    <div><h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">1. Your Information</h3><div class="space-y-3"><input type="text" id="business-name" placeholder="Your Business Name" required><input type="text" id="business-address" placeholder="Your Business Address" required><input type="text" id="business-tax-id" placeholder="Tax ID (Optional)"><input type="file" id="logo-upload" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"></div></div>
+                    <div><h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">2. Client Information</h3><div class="space-y-3"><input type="text" id="client-name" placeholder="Client Name" required><input type="text" id="client-address" placeholder="Client Address" required></div></div>
+                    <div><h3 class="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">3. Services & Payment</h3><div id="service-items-container" class="space-y-3"></div><button type="button" id="add-service-btn" class="btn btn-secondary !text-sm w-full mt-2">+ Add Service</button><div class="border-t pt-4 mt-4 space-y-3"><select id="tax-option"><option value="none">No Tax</option><option value="ca">Canadian Tax</option></select><div id="canada-tax-controls" class="tax-controls hidden"><select id="province-tax"><option value="AB">Alberta (5%)</option><option value="BC">British Columbia (12%)</option><option value="MB">Manitoba (12%)</option><option value="NB">New Brunswick (15%)</option><option value="NL" selected>Newfoundland (15%)</option><option value="NT">Northwest Territories (5%)</option><option value="NS">Nova Scotia (15%)</option><option value="NU">Nunavut (5%)</option><option value="ON">Ontario (13%)</option><option value="PE">Prince Edward Island (15%)</option><option value="QC">Quebec (14.975%)</option><option value="SK">Saskatchewan (11%)</option><option value="YT">Yukon (5%)</option></select></div><input type="date" id="payment-date" required><input type="text" id="receipt-number" placeholder="Receipt Number" required></div></div>
+                    <div class="flex items-center justify-end pt-4"><button type="submit" class="btn btn-primary w-full">Generate & Preview</button></div>
+                </form>
+            </div>
+
+            <!-- Preview Section -->
+            <div class="lg:col-span-3">
+                <div class="sticky top-8">
+                    <div id="receipt-preview" class="bg-white rounded-xl shadow-lg p-8 min-h-[500px]">
+                        <div class="text-center h-full flex items-center justify-center text-gray-400"><p>Receipt preview appears here</p></div>
+                    </div>
+                    <div class="text-center mt-4"><button id="download-pdf-btn" class="btn btn-success" disabled>Download PDF</button></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Hidden container for PDF generation -->
+    <div id="pdf-content" style="position: absolute; left: -9999px; top: -9999px; width: 8.5in;"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- State ---
+    let receiptData = {};
+    let logoUrl = '';
+
+    // --- Element Refs ---
+    const receiptForm = document.getElementById('receipt-form');
+    const serviceContainer = document.getElementById('service-items-container');
+    const addServiceBtn = document.getElementById('add-service-btn');
+    const taxOption = document.getElementById('tax-option');
+    const canadaTaxControls = document.getElementById('canada-tax-controls');
+    const receiptPreviewEl = document.getElementById('receipt-preview');
+    const pdfContentEl = document.getElementById('pdf-content');
+    const downloadBtn = document.getElementById('download-pdf-btn');
+    const paymentDateInput = document.getElementById('payment-date');
+    const receiptNumberInput = document.getElementById('receipt-number');
+    const logoUploadInput = document.getElementById('logo-upload');
+
+    const canadianTaxRates = { AB: 0.05,BC: 0.12,MB: 0.12,NB: 0.15,NL: 0.15,NT: 0.05,NS: 0.15,NU: 0.05,ON: 0.13,PE: 0.15,QC: 0.14975,SK: 0.11,YT: 0.05 };
+
+    // --- Functions ---
+    const initializeGenerator = () => {
+        paymentDateInput.value = new Date().toISOString().split('T')[0];
+        receiptNumberInput.value = \`RCPT-\${Date.now()}\`;
+        if (serviceContainer.childElementCount === 0) addServiceItem();
+    };
+
+    const addServiceItem = () => {
+        const div = document.createElement('div');
+        div.className = 'service-item flex gap-2 items-center';
+        div.innerHTML = \`<input type="text" class="service-desc flex-grow" placeholder="Service Description" required><input type="number" class="service-amount w-28" placeholder="Amount" required min="0" step="0.01"><button type="button" class="remove-service-btn btn !bg-red-100 !text-red-600 !p-2 !rounded-full !shadow-none"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg></button>\`;
+        serviceContainer.appendChild(div);
+        div.querySelector('.remove-service-btn').addEventListener('click', () => div.remove());
+    };
+
+    const getReceiptFormData = () => {
+        let subtotal = 0;
+        const services = Array.from(serviceContainer.querySelectorAll('.service-item')).map(item => {
+            const amount = parseFloat(item.querySelector('.service-amount').value) || 0;
+            subtotal += amount;
+            return { desc: item.querySelector('.service-desc').value, amount };
+        });
+        const taxChoice = taxOption.value;
+        let taxRate = 0, taxAmount = 0, taxInfo = { option: 'none' };
+        if (taxChoice === 'ca') {
+            const province = document.getElementById('province-tax').value;
+            taxRate = canadianTaxRates[province];
+            taxAmount = subtotal * taxRate;
+            taxInfo = { option: 'ca', location: province, rate: taxRate, amount: taxAmount };
+        }
+        return {
+            businessName: document.getElementById('business-name').value,
+            businessAddress: document.getElementById('business-address').value,
+            taxId: document.getElementById('business-tax-id').value,
+            logoUrl: logoUrl,
+            clientName: document.getElementById('client-name').value,
+            clientAddress: document.getElementById('client-address').value,
+            receiptNumber: receiptNumberInput.value,
+            paymentDate: paymentDateInput.value,
+            services, subtotal, taxInfo, totalAmount: subtotal + taxAmount,
+        };
+    };
+
+    const displayFullReceipt = (data) => {
+        const issueDate = new Date(data.paymentDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        
+        let servicesHtml = '';
+        if(data.services.length > 0){
+            servicesHtml = data.services.map(s => \`<tr><td style="padding: 8px 16px 8px 0; border-bottom: 1px solid #eee;">\${s.desc}</td><td style="text-align: right; padding: 8px 0 8px 16px; border-bottom: 1px solid #eee;">$\${s.amount.toFixed(2)}</td></tr>\`).join('');
+        }
+        
+        let tfootHtml = '';
+        if (data.taxInfo.option === 'ca') {
+            tfootHtml += \`<tr><td style="padding: 8px 16px 2px 0; color: #6b7280; text-align: right;">Subtotal</td><td style="text-align: right; padding: 8px 0 2px 16px;">$\${data.subtotal.toFixed(2)}</td></tr>\`;
+            tfootHtml += \`<tr><td style="padding: 2px 16px 8px 0; color: #6b7280; text-align: right;">Tax (\${data.taxInfo.location} @ \${(data.taxInfo.rate * 100).toFixed(3)}%)</td><td style="text-align: right; padding: 2px 0 8px 16px;">$\${data.taxInfo.amount.toFixed(2)}</td></tr>\`;
+        }
+        tfootHtml += \`<tr style="font-weight: bold; color: #111827;"><td style="padding-top: 8px; padding-right: 16px; text-align: right;">Total Paid</td><td style="text-align: right; padding-top: 8px; padding-left: 16px;">$\${data.totalAmount.toFixed(2)}</td></tr>\`;
+        
+        const logoHtml = data.logoUrl ? \`<img src="\${data.logoUrl}" alt="Business Logo" style="margin-bottom: 2rem; max-height: 5rem;">\` : '';
+        
+        const receiptHtml = \`
+            <div style="font-family: Arial, sans-serif; font-size: 12px; padding: 20px;">
+                \${logoHtml}
+                <table style="width: 100%; margin-bottom: 30px;"><tr><td style="vertical-align: top;"><h2 style="font-size: 24px; font-weight: bold; margin: 0; color: #111827;">\${data.businessName}</h2><p style="margin: 0; color: #4b5563;">\${data.businessAddress}</p><p style="margin: 0; color: #4b5563;">Tax ID: \${data.taxId}</p></td><td style="text-align: right; vertical-align: top;"><h3 style="font-size: 20px; font-weight: bold; margin: 0; color: #1f2937;">RECEIPT</h3><p style="margin: 0; color: #4b5563;">#\${data.receiptNumber}</p><p style="margin: 0; color: #4b5563;">Date: \${issueDate}</p></td></tr></table>
+                <div style="margin-bottom: 30px;"><h4 style="font-size: 10px; color: #6b7280; text-transform: uppercase; margin: 0 0 5px 0;">Bill To</h4><p style="font-weight: bold; margin: 0; color: #1f2937;">\${data.clientName}</p><p style="margin: 0; color: #4b5563;">\${data.clientAddress}</p></div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+                    <thead style="border-bottom: 2px solid #333;"><tr style="color: #333;"><th style="text-align: left; font-weight: bold; padding-bottom: 8px;">Description</th><th style="text-align: right; font-weight: bold; padding-bottom: 8px;">Amount</th></tr></thead>
+                    <tbody>\${servicesHtml}</tbody>
+                    <tfoot style="border-top: 2px solid #e5e7eb; font-medium;">\${tfootHtml}</tfoot>
+                </table>
+            </div>\`;
+        
+        receiptPreviewEl.innerHTML = receiptHtml;
+        pdfContentEl.innerHTML = receiptHtml;
+    };
+
+    const downloadPdf = () => {
+        if (!Object.keys(receiptData).length) return;
+        const element = document.getElementById('pdf-content');
+        html2pdf().from(element).set({
+            margin: 0,
+            filename: \`Receipt-\${receiptData.receiptNumber}.pdf\`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        }).save();
+    };
+
+    // --- Event Listeners ---
+    addServiceBtn.addEventListener('click', addServiceItem);
+    taxOption.addEventListener('change', () => { canadaTaxControls.style.display = taxOption.value === 'ca' ? 'block' : 'none'; });
+    receiptForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        receiptData = getReceiptFormData();
+        displayFullReceipt(receiptData);
+        downloadBtn.disabled = false;
+    });
+    downloadBtn.addEventListener('click', downloadPdf);
+    logoUploadInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => { logoUrl = event.target.result; };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // --- Initial Call ---
+    initializeGenerator();
+});
+</script>
+
+</body>
+</html>
