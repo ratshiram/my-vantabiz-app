@@ -5,7 +5,7 @@ import { CheckCircle2 } from "lucide-react";
 const tiers = [
   {
     name: "Free Trial",
-    price: "$0",
+    price: "C$0",
     duration: "/ 7 days",
     features: [
       "Access to FinTrack Lite",
@@ -18,7 +18,7 @@ const tiers = [
   },
   {
     name: "Pro",
-    price: "$10",
+    price: "C$10",
     duration: "/ month",
     features: [
       "Full access to FinTrack Lite",
@@ -79,7 +79,7 @@ export default function PricingPage() {
         ))}
       </div>
        <div className="mt-12 text-center text-muted-foreground">
-          <p>All prices are in USD. You can cancel your Pro subscription at any time.</p>
+          <p>All prices are in CAD. You can cancel your Pro subscription at any time.</p>
       </div>
     </main>
   );
