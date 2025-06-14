@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -6,17 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusCircle, Trash2, Download } from 'lucide-react';
-import type { InvoiceData, ServiceItem } from '@/lib/types'; // Will define these types
+import { PlusCircle, Trash2, Download, Save, Loader2 } from 'lucide-react';
+import type { InvoiceDocument, ServiceItem as ClientServiceItem, TaxInfo as ClientTaxInfo } from '@/lib/types'; // Adjusted types
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/hooks/use-auth';
+import { db } from '@/lib/firebase';
+import { collection, doc, setDoc, Timestamp } from 'firebase/firestore';
 
-// Canadian Tax Rates - can be moved to a constants file
 const canadianTaxRates: Record<string, number> = { AB: 0.05,BC: 0.12,MB: 0.12,NB: 0.15,NL: 0.15,NT: 0.05,NS: 0.15,NU: 0.05,ON: 0.13,PE: 0.15,QC: 0.14975,SK: 0.11,YT: 0.05 };
 const provinces = Object.keys(canadianTaxRates).map(p => ({ value: p, label: `${p} (${(canadianTaxRates[p]*100).toFixed(canadianTaxRates[p] === 0.14975 ? 3:0)}%)`}));
 
 export function InvoiceGeneratorClient() {
   const { toast } = useToast();
+  const { user, isLoading: authLoading } = useAuth();
   const [isClient, setIsClient] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
@@ -26,7 +31,7 @@ export function InvoiceGeneratorClient() {
   const [clientName, setClientName] = useState('');
   const [clientAddress, setClientAddress] = useState('');
 
-  const [serviceItems, setServiceItems] = useState<ServiceItem[]>([{ id: crypto.randomUUID(), description: '', amount: 0 }]);
+  const [serviceItems, setServiceItems] = useState<ClientServiceItem[]>([{ id: crypto.randomUUID(), description: '', amount: 0 }]);
   const [taxOption, setTaxOption] = useState('none');
   const [provinceTax, setProvinceTax] = useState('NL');
   const [paymentDate, setPaymentDate] = useState('');
@@ -53,60 +58,53 @@ export function InvoiceGeneratorClient() {
     setServiceItems(serviceItems.filter(item => item.id !== id));
   };
 
-  const handleServiceChange = (id: string, field: keyof ServiceItem, value: string | number) => {
+  const handleServiceChange = (id: string, field: keyof ClientServiceItem, value: string | number) => {
     setServiceItems(serviceItems.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
   
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        toast({ title: "Logo Too Large", description: "Please upload a logo smaller than 2MB.", variant: "destructive" });
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => setLogoUrl(e.target?.result as string);
       reader.readAsDataURL(file);
     }
   };
 
-  const generatePreview = () => {
+  const calculateTotals = () => {
     const subtotal = serviceItems.reduce((sum, item) => sum + Number(item.amount), 0);
     let taxRate = 0;
     let taxAmount = 0;
-    let taxInfoDisplay = 'No Tax';
+    let taxDisplay = 'No Tax';
+    let taxInfoForDoc: ClientTaxInfo = { option: 'none' };
 
     if (taxOption === 'ca') {
       taxRate = canadianTaxRates[provinceTax];
       taxAmount = subtotal * taxRate;
-      taxInfoDisplay = `Tax (${provinceTax} @ ${(taxRate * 100).toFixed(canadianTaxRates[provinceTax] === 0.14975 ? 3:0)}%)`;
+      taxDisplay = `Tax (${provinceTax} @ ${(taxRate * 100).toFixed(canadianTaxRates[provinceTax] === 0.14975 ? 3:0)}%)`;
+      taxInfoForDoc = { option: 'ca', location: provinceTax, rate: taxRate, amount: taxAmount };
     }
     const totalAmount = subtotal + taxAmount;
+    return { subtotal, taxAmount, totalAmount, taxDisplay, taxInfoForDoc };
+  };
 
+  const generatePreview = () => {
+    const { subtotal, taxAmount, totalAmount, taxDisplay } = calculateTotals();
     const formattedDate = paymentDate ? new Date(paymentDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
-
     const servicesHtml = serviceItems.map(s => `<tr><td style="padding: 8px 16px 8px 0; border-bottom: 1px solid #eee;">${s.description || 'N/A'}</td><td style="text-align: right; padding: 8px 0 8px 16px; border-bottom: 1px solid #eee;">$${Number(s.amount).toFixed(2)}</td></tr>`).join('');
-    
     let tfootHtml = `<tr><td style="padding: 8px 16px 2px 0; color: #6b7280; text-align: right;">Subtotal</td><td style="text-align: right; padding: 8px 0 2px 16px;">$${subtotal.toFixed(2)}</td></tr>`;
     if (taxOption !== 'none') {
-        tfootHtml += `<tr><td style="padding: 2px 16px 8px 0; color: #6b7280; text-align: right;">${taxInfoDisplay}</td><td style="text-align: right; padding: 2px 0 8px 16px;">$${taxAmount.toFixed(2)}</td></tr>`;
+        tfootHtml += `<tr><td style="padding: 2px 16px 8px 0; color: #6b7280; text-align: right;">${taxDisplay}</td><td style="text-align: right; padding: 2px 0 8px 16px;">$${taxAmount.toFixed(2)}</td></tr>`;
     }
     tfootHtml += `<tr style="font-weight: bold; color: #111827;"><td style="padding-top: 8px; padding-right: 16px; text-align: right;">Total Paid</td><td style="text-align: right; padding-top: 8px; padding-left: 16px;">$${totalAmount.toFixed(2)}</td></tr>`;
-
     const logoDisplayHtml = logoUrl ? `<img src="${logoUrl}" alt="Business Logo" style="margin-bottom: 2rem; max-height: 5rem; max-width: 10rem; object-fit: contain;">` : '';
-
-    const html = `
-      <div style="font-family: 'Inter', Arial, sans-serif; font-size: 12px; padding: 20px; color: #374151;">
-        ${logoDisplayHtml}
-        <table style="width: 100%; margin-bottom: 30px;"><tr><td style="vertical-align: top;"><h2 style="font-size: 24px; font-weight: bold; margin: 0; color: #111827;">${businessName || 'Your Business Name'}</h2><p style="margin: 0;">${businessAddress || 'Your Business Address'}</p>${businessTaxId ? `<p style="margin:0;">Tax ID: ${businessTaxId}</p>` : ''}</td><td style="text-align: right; vertical-align: top;"><h3 style="font-size: 20px; font-weight: bold; margin: 0; color: #1f2937;">RECEIPT</h3><p style="margin: 0;">#${receiptNumber || 'RCPT-XXXX'}</p><p style="margin: 0;">Date: ${formattedDate}</p></td></tr></table>
-        <div style="margin-bottom: 30px;"><h4 style="font-size: 10px; color: #6b7280; text-transform: uppercase; margin: 0 0 5px 0;">Bill To</h4><p style="font-weight: bold; margin: 0; color: #1f2937;">${clientName || 'Client Name'}</p><p style="margin: 0;">${clientAddress || 'Client Address'}</p></div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
-          <thead style="border-bottom: 2px solid #333;"><tr style="color: #333;"><th style="text-align: left; font-weight: bold; padding-bottom: 8px;">Description</th><th style="text-align: right; font-weight: bold; padding-bottom: 8px;">Amount</th></tr></thead>
-          <tbody>${servicesHtml}</tbody>
-          <tfoot style="border-top: 2px solid #e5e7eb; font-medium;">${tfootHtml}</tfoot>
-        </table>
-      </div>
-    `;
+    const html = `<div style="font-family: 'Inter', Arial, sans-serif; font-size: 12px; padding: 20px; color: #374151;">${logoDisplayHtml}<table style="width: 100%; margin-bottom: 30px;"><tr><td style="vertical-align: top;"><h2 style="font-size: 24px; font-weight: bold; margin: 0; color: #111827;">${businessName || 'Your Business Name'}</h2><p style="margin: 0;">${businessAddress || 'Your Business Address'}</p>${businessTaxId ? `<p style="margin:0;">Tax ID: ${businessTaxId}</p>` : ''}</td><td style="text-align: right; vertical-align: top;"><h3 style="font-size: 20px; font-weight: bold; margin: 0; color: #1f2937;">RECEIPT</h3><p style="margin: 0;">#${receiptNumber || 'RCPT-XXXX'}</p><p style="margin: 0;">Date: ${formattedDate}</p></td></tr></table><div style="margin-bottom: 30px;"><h4 style="font-size: 10px; color: #6b7280; text-transform: uppercase; margin: 0 0 5px 0;">Bill To</h4><p style="font-weight: bold; margin: 0; color: #1f2937;">${clientName || 'Client Name'}</p><p style="margin: 0;">${clientAddress || 'Client Address'}</p></div><table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;"><thead style="border-bottom: 2px solid #333;"><tr style="color: #333;"><th style="text-align: left; font-weight: bold; padding-bottom: 8px;">Description</th><th style="text-align: right; font-weight: bold; padding-bottom: 8px;">Amount</th></tr></thead><tbody>${servicesHtml}</tbody><tfoot style="border-top: 2px solid #e5e7eb; font-medium;">${tfootHtml}</tfoot></table></div>`;
     setPreviewHtml(html);
-    if (pdfContentRef.current) {
-        pdfContentRef.current.innerHTML = html;
-    }
+    if (pdfContentRef.current) { pdfContentRef.current.innerHTML = html; }
     setCanDownload(true);
     toast({ title: "Preview Updated", description: "Receipt preview has been generated."});
   };
@@ -114,26 +112,68 @@ export function InvoiceGeneratorClient() {
   const handleDownloadPdf = async () => {
     if (!canDownload || !pdfContentRef.current || typeof window === 'undefined') return;
     const html2pdf = (await import('html2pdf.js')).default;
-    
     const elementToPrint = pdfContentRef.current.cloneNode(true) as HTMLElement;
-    elementToPrint.style.width = '8.5in'; // Standard letter width
+    elementToPrint.style.width = '8.5in';
+    html2pdf().from(elementToPrint).set({ margin: 0.5, filename: `Receipt-${receiptNumber || 'xxxx'}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: false }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }}).save();
+  };
 
-    html2pdf().from(elementToPrint).set({
-        margin: 0.5, // 0.5 inch margin
-        filename: `Receipt-${receiptNumber || 'xxxx'}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    }).save();
+  const handleSaveInvoice = async () => {
+    if (!user) {
+      toast({ title: "Not Logged In", description: "Please log in to save invoices.", variant: "destructive" });
+      return;
+    }
+    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount > 0)) {
+        toast({ title: "Incomplete Form", description: "Please fill all required fields and add at least one valid service item.", variant: "destructive"});
+        return;
+    }
+    setIsSaving(true);
+    const { subtotal, taxAmount, totalAmount, taxInfoForDoc } = calculateTotals();
+    const invoiceId = crypto.randomUUID();
+    
+    const invoiceToSave: InvoiceDocument = {
+      id: invoiceId,
+      userId: user.id,
+      businessName,
+      businessAddress,
+      taxId: businessTaxId,
+      logoUrl,
+      clientName,
+      clientAddress,
+      receiptNumber,
+      paymentDate: Timestamp.fromDate(new Date(paymentDate + 'T00:00:00')), // Store as Firestore Timestamp
+      services: serviceItems.map(s => ({ description: s.description, amount: s.amount })),
+      subtotal,
+      taxInfo: taxInfoForDoc,
+      totalAmount,
+      createdAt: Timestamp.now(),
+    };
+
+    try {
+      await setDoc(doc(db, "invoices", invoiceId), invoiceToSave);
+      toast({ title: "Invoice Saved", description: "Your invoice has been successfully saved to your account." });
+    } catch (error) {
+      console.error("Error saving invoice:", error);
+      toast({ title: "Save Failed", description: "Could not save the invoice. Please try again.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
   };
   
-  if (!isClient) {
-    return <div className="flex justify-center items-center h-64"><p>Loading Invoice Generator...</p></div>;
+  if (!isClient || authLoading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary"/> <p className="ml-2">Loading Invoice Generator...</p></div>;
   }
+   if (!user && !authLoading) {
+     return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] bg-background">
+        <h2 className="text-2xl font-semibold text-primary mb-4">Invoice & Receipt Generator</h2>
+        <p className="text-muted-foreground">Please log in or sign up to create and save invoices.</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-      {/* Form Section */}
       <Card className="lg:col-span-2 shadow-xl">
         <CardContent className="p-6">
           <form onSubmit={(e) => { e.preventDefault(); generatePreview(); }} className="space-y-6">
@@ -143,7 +183,7 @@ export function InvoiceGeneratorClient() {
                 <div><Label htmlFor="business-name">Business Name</Label><Input id="business-name" value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="Your Business Name" required /></div>
                 <div><Label htmlFor="business-address">Business Address</Label><Input id="business-address" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} placeholder="Your Business Address" required /></div>
                 <div><Label htmlFor="business-tax-id">Tax ID (Optional)</Label><Input id="business-tax-id" value={businessTaxId} onChange={e => setBusinessTaxId(e.target.value)} placeholder="e.g., HST Number" /></div>
-                <div><Label htmlFor="logo-upload">Logo (Optional)</Label><Input id="logo-upload" type="file" accept="image/*" onChange={handleLogoUpload} className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"/></div>
+                <div><Label htmlFor="logo-upload">Logo (Optional, max 2MB)</Label><Input id="logo-upload" type="file" accept="image/*" onChange={handleLogoUpload} className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"/></div>
               </div>
             </div>
 
@@ -199,7 +239,6 @@ export function InvoiceGeneratorClient() {
         </CardContent>
       </Card>
 
-      {/* Preview Section */}
       <div className="lg:col-span-3">
         <Card className="sticky top-8 shadow-xl">
             <CardHeader>
@@ -209,13 +248,16 @@ export function InvoiceGeneratorClient() {
             <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="prose prose-sm max-w-none"/>
           </CardContent>
         </Card>
-        <div className="text-center mt-4">
+        <div className="flex justify-center items-center gap-4 mt-4">
+          <Button onClick={handleSaveInvoice} disabled={!canDownload || isSaving || !user} className="bg-green-600 hover:bg-green-700 text-white">
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {isSaving ? "Saving..." : "Save Invoice"}
+          </Button>
           <Button onClick={handleDownloadPdf} disabled={!canDownload} className="bg-accent hover:bg-accent/90 text-accent-foreground">
             <Download className="mr-2 h-4 w-4" /> Download PDF
           </Button>
         </div>
       </div>
-      {/* Hidden div for PDF generation. Ensure it's not displayed but available in DOM for html2pdf */}
       <div ref={pdfContentRef} style={{ position: 'absolute', left: '-9999px', top: '-9999px', fontFamily: 'Inter, Arial, sans-serif', fontSize: '12px', color: '#374151', background: 'white' }}></div>
     </div>
   );

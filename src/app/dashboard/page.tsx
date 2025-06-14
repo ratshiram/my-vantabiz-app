@@ -1,7 +1,7 @@
+
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-// AppHeader is now part of MainLayout, so it's removed from here.
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DashboardSummary } from '@/components/dashboard/dashboard-summary';
 import { MonthlyOverviewChart } from '@/components/dashboard/monthly-overview-chart';
 import { IncomeForm } from '@/components/transactions/income-form';
@@ -9,43 +9,92 @@ import { ExpenseForm } from '@/components/transactions/expense-form';
 import { TransactionsTable } from '@/components/transactions/transactions-table';
 import type { Transaction, TransactionFormValues, MonthlyData } from '@/lib/types';
 import { format, getYear } from 'date-fns';
+import { useAuth } from '@/hooks/use-auth';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, query, where, getDocs, orderBy, Timestamp, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
 
-export default function FinTrackPage() { // Renamed component for clarity
+export default function FinTrackPage() {
+  const { user, isLoading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    const storedTransactions = localStorage.getItem('fintracklite-transactions');
-    if (storedTransactions) {
-      try {
-        const parsedTransactions = JSON.parse(storedTransactions).map((t: any) => ({
-          ...t,
-          date: new Date(t.date)
-        }));
-        setTransactions(parsedTransactions);
-      } catch (error) {
-        console.error("Failed to parse transactions from localStorage", error);
-        localStorage.removeItem('fintracklite-transactions');
-      }
-    }
   }, []);
 
-  useEffect(() => {
-    if (isClient) {
-      localStorage.setItem('fintracklite-transactions', JSON.stringify(transactions));
+  const fetchTransactions = useCallback(async () => {
+    if (!user) {
+      setTransactions([]);
+      setIsLoadingTransactions(false);
+      return;
     }
-  }, [transactions, isClient]);
+    setIsLoadingTransactions(true);
+    try {
+      const q = query(
+        collection(db, "transactions"),
+        where("userId", "==", user.id),
+        orderBy("date", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      const fetchedTransactions: Transaction[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedTransactions.push({
+          id: doc.id, // Use Firestore document ID
+          userId: data.userId,
+          type: data.type,
+          description: data.description,
+          date: (data.date as Timestamp).toDate(), // Convert Firestore Timestamp to JS Date
+          amount: data.amount,
+          category: data.category,
+        } as Transaction);
+      });
+      setTransactions(fetchedTransactions);
+    } catch (error) {
+      console.error("Error fetching transactions: ", error);
+      // Handle error (e.g., show toast)
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  }, [user]);
 
-  const addTransaction = (values: TransactionFormValues, type: 'income' | 'expense') => {
-    const newTransaction: Transaction = {
-      id: crypto.randomUUID(),
-      ...values,
+  useEffect(() => {
+    if (user && !authLoading) {
+      fetchTransactions();
+    } else if (!authLoading && !user) {
+      // User logged out or not logged in, clear transactions
+      setTransactions([]);
+      setIsLoadingTransactions(false);
+    }
+  }, [user, authLoading, fetchTransactions]);
+
+  const addTransaction = async (values: TransactionFormValues, type: 'income' | 'expense') => {
+    if (!user) {
+      // Handle case where user is not logged in (e.g., show toast, redirect)
+      console.error("User not logged in, cannot add transaction.");
+      return;
+    }
+    const transactionId = crypto.randomUUID(); // Generate client-side ID to use for Firestore doc ID
+    const newTransactionData = {
+      userId: user.id,
       type,
+      ...values,
+      date: Timestamp.fromDate(values.date), // Convert JS Date to Firestore Timestamp for storing
     };
-    setTransactions(prev => [newTransaction, ...prev]);
-  };
 
+    try {
+      // Use the client-generated ID for the document
+      await setDoc(doc(db, "transactions", transactionId), newTransactionData);
+      // Optimistically update UI or refetch
+      setTransactions(prev => [{ id: transactionId, userId: user.id, type, ...values }, ...prev]);
+    } catch (error) {
+      console.error("Error adding transaction: ", error);
+      // Handle error (e.g., show toast)
+    }
+  };
+  
   const totalIncome = useMemo(() => 
     transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0), 
     [transactions]
@@ -85,25 +134,31 @@ export default function FinTrackPage() { // Renamed component for clarity
         });
     }
     return yearMonths;
-
   }, [transactions]);
 
-  if (!isClient) {
+  if (!isClient || authLoading || isLoadingTransactions) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] bg-background">
-        <div className="animate-pulse">
-          <svg className="h-16 w-16 text-primary" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="8" fill="currentColor"/><path d="M11 12L16.6667 28L20.4444 18.2222L29 12L20.4444 15.7778L16.6667 28L14.7778 21.8889L11 19.5556L18.5556 16.6667L11 12Z" fill="white"/></svg>
-        </div>
+        <Loader2 className="h-16 w-16 text-primary animate-spin" />
         <p className="text-xl font-semibold text-primary mt-4">Loading FinTrack Lite...</p>
       </div>
     );
   }
+  
+  if (!user && !authLoading) {
+     return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] bg-background">
+        <h2 className="text-2xl font-semibold text-primary mb-4">Welcome to FinTrack Lite!</h2>
+        <p className="text-muted-foreground">Please log in or sign up to manage your finances.</p>
+      </div>
+    );
+  }
+
 
   return (
-    // Removed AppHeader and footer as they are now in MainLayout
     <main className="container mx-auto p-4 sm:p-6 lg:p-8 flex-grow">
       <h1 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-8 text-center">FinTrack Lite Dashboard</h1>
-      <section id="dashboard-summary" className="mb-8 sm:mb-12"> {/* Updated id for clarity */}
+      <section id="dashboard-summary" className="mb-8 sm:mb-12">
         <DashboardSummary 
           totalIncome={totalIncome} 
           totalExpenses={totalExpenses} 
