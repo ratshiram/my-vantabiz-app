@@ -11,7 +11,8 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  type User as FirebaseUser 
+  type User as FirebaseUser,
+  type AuthError // Import AuthError for better type checking, though instanceof Error often suffices
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -21,6 +22,7 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { app } from '@/lib/firebase'; // Assuming firebase app is initialized and exported from here
+import { useToast } from "@/hooks/use-toast"; // Ensure useToast is imported
 
 interface AuthContextType {
   user: User | null;
@@ -43,6 +45,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { toast } = useToast(); // Initialize toast
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -56,27 +59,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
           if (userData.trialEndDate && userData.trialEndDate instanceof Timestamp) {
             trialEndDate = userData.trialEndDate.toDate();
           } else if (userData.trialEndDate && typeof userData.trialEndDate === 'string') {
-            trialEndDate = new Date(userData.trialEndDate); // Fallback if stored as string
+            trialEndDate = new Date(userData.trialEndDate); 
           }
 
           setUser({
             id: firebaseUser.uid,
             email: firebaseUser.email || "",
             name: userData.name || firebaseUser.displayName || "",
-            username: userData.username || "", // Load username
+            username: userData.username || "", 
             tier: userData.tier || 'free',
             trialEndDate: trialEndDate,
           });
         } else {
-          // This case might happen if user exists in Auth but not Firestore. Handle as needed.
-          // For now, treat as no full profile, default to basic info.
            setUser({
             id: firebaseUser.uid,
             email: firebaseUser.email || "",
             name: firebaseUser.displayName || "User",
-            username: "", // Default username if no doc
+            username: "", 
             tier: 'free', 
-            trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default new trial
+            trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
           });
         }
       } else {
@@ -92,18 +93,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      // onAuthStateChanged will handle setting user state and fetching data
       router.push('/'); 
     } catch (error) {
       setIsLoading(false);
-      console.error("Login failed:", error);
-      if (error instanceof Error) {
-        throw new Error(error.message || "Failed to login.");
+      let errorMessage = "An unexpected error occurred during login.";
+      // Firebase errors usually have a 'code' and 'message'
+      if (error instanceof Error && (error as any).code) {
+        errorMessage = `Error: ${(error as any).code} - ${error.message}`;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
       }
-      throw new Error("An unexpected error occurred during login.");
+      console.error("Login failed:", error); 
+      toast({
+        title: "Login Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      // Re-throw if you need to handle it further up the chain, otherwise toast is user feedback
+      // throw new Error(errorMessage); 
     }
-    // setIsLoading(false) is handled by onAuthStateChanged listener
-  }, [router]);
+  }, [router, toast]);
 
   const signup = useCallback(async (values: SignupFormValues) => {
     setIsLoading(true);
@@ -112,49 +121,59 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const firebaseUser = userCredential.user;
       
       const trialEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      // This local User object isn't directly used beyond this point as onAuthStateChanged handles setUser
-      // const newUser: User = {
-      //   id: firebaseUser.uid,
-      //   email: values.email,
-      //   name: values.name,
-      //   username: values.username, // Include username
-      //   tier: 'free',
-      //   trialEndDate: trialEndDate,
-      // };
 
       await setDoc(doc(db, "users", firebaseUser.uid), {
         name: values.name,
-        username: values.username, // Save username
+        username: values.username,
         email: values.email,
         tier: 'free',
-        trialEndDate: Timestamp.fromDate(trialEndDate), // Store as Firestore Timestamp
+        trialEndDate: Timestamp.fromDate(trialEndDate),
       });
       
-      // setUser(newUser); // onAuthStateChanged will handle this
       router.push('/');
     } catch (error) {
       setIsLoading(false);
-      console.error("Signup failed:", error);
-      if (error instanceof Error) {
-         throw new Error(error.message || "Failed to sign up.");
+      let errorMessage = "An unexpected error occurred during signup.";
+      // Firebase errors usually have a 'code' and 'message'
+      if (error instanceof Error && (error as any).code) {
+        errorMessage = `Error: ${(error as any).code} - ${error.message}`;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
       }
-      throw new Error("An unexpected error occurred during signup.");
+      console.error("Signup failed:", error); 
+      toast({
+        title: "Signup Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      // Re-throw if you need to handle it further up the chain
+      // throw new Error(errorMessage);
     }
-    // setIsLoading(false) is handled by onAuthStateChanged listener
-  }, [router]);
+  }, [router, toast]);
 
   const logout = useCallback(async () => {
     setIsLoading(true);
     try {
       await signOut(auth);
-      // onAuthStateChanged will set user to null
       router.push('/login');
     } catch (error) {
         console.error("Logout failed: ", error);
+        toast({
+            title: "Logout Failed",
+            description: "An error occurred while trying to log out.",
+            variant: "destructive"
+        });
     } finally {
-        setIsLoading(false); // Explicitly set here as onAuthStateChanged might take time
+        // onAuthStateChanged will set user to null and isLoading to false eventually
+        // but for immediate UI feedback on logout action, we can set isLoading here.
+        // However, relying on onAuthStateChanged is generally cleaner.
+        // For now, let onAuthStateChanged handle user and final loading state.
+        // If router.push('/login') happens before onAuthStateChanged fully processes,
+        // the login page might briefly show a loading state or the old user state.
+        // To be safe, let's ensure isLoading is false after attempting logout.
+        setIsLoading(false);
     }
-  }, [router]);
+  }, [router, toast]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
@@ -162,4 +181,3 @@ export function AuthProvider({ children }: AuthProviderProps) {
     </AuthContext.Provider>
   );
 }
-
