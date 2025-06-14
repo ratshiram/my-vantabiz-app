@@ -15,7 +15,7 @@ export function AppHeader() {
         <LogoIcon />
         <span className="text-3xl sm:text-4xl font-extrabold text-primary group-hover:text-primary/90 transition-colors">VantaBiz Suite</span>
       </Link>
-      <p className="text-md sm:text-lg text-muted-foreground mt-1 sm:mt-2 font-medium">Your All-in-One Business Toolkit</p>
+      <p className="text-md sm:text-lg text-foreground mt-1 sm:mt-2 font-medium">Your All-in-One Business Toolkit</p>
     </header>
   );
 }
