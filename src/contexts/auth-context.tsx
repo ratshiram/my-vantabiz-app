@@ -12,7 +12,7 @@ import {
   signOut, 
   onAuthStateChanged,
   type User as FirebaseUser,
-  type AuthError // Import AuthError for better type checking, though instanceof Error often suffices
+  type AuthError
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -21,8 +21,8 @@ import {
   getDoc,
   Timestamp
 } from 'firebase/firestore';
-import { app } from '@/lib/firebase'; // Assuming firebase app is initialized and exported from here
-import { useToast } from "@/hooks/use-toast"; // Ensure useToast is imported
+import { app } from '@/lib/firebase';
+import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType {
   user: User | null;
@@ -34,10 +34,6 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
-
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -45,7 +41,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -71,14 +67,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
             trialEndDate: trialEndDate,
           });
         } else {
+           // This case might happen if user exists in Auth but not in Firestore (e.g., Firestore doc creation failed)
+           // Or for newly created users before Firestore doc is set.
+           // We can create a default user object here or handle it based on app logic.
+           // For now, creating a basic user object with default trial.
+           const defaultTrialEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
            setUser({
             id: firebaseUser.uid,
             email: firebaseUser.email || "",
-            name: firebaseUser.displayName || "User",
-            username: "", 
+            name: firebaseUser.displayName || "User", // Or prompt user to set name
+            username: "", // Or prompt user to set username
             tier: 'free', 
-            trialEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
+            trialEndDate: defaultTrialEndDate, 
           });
+           // Optionally, create the Firestore document if it's missing and should exist
+           // await setDoc(userDocRef, { email: firebaseUser.email, name: "User", username: "", tier: 'free', trialEndDate: Timestamp.fromDate(defaultTrialEndDate) }, { merge: true });
         }
       } else {
         setUser(null);
@@ -94,23 +97,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       router.push('/'); 
+      // Toast for success is handled by the form if needed, or can be added here
     } catch (error) {
       setIsLoading(false);
+      let errorCode = "Unknown error";
       let errorMessage = "An unexpected error occurred during login.";
-      // Firebase errors usually have a 'code' and 'message'
-      if (error instanceof Error && (error as any).code) {
-        errorMessage = `Error: ${(error as any).code} - ${error.message}`;
+      
+      if (error instanceof Error && (error as AuthError).code) {
+        const firebaseError = error as AuthError;
+        errorCode = firebaseError.code;
+        errorMessage = firebaseError.message;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      console.error("Login failed:", error); 
+      
+      console.error("Login Failed:", errorCode, errorMessage, error); 
       toast({
         title: "Login Failed",
-        description: errorMessage,
+        description: `Error: ${errorCode}. ${errorMessage}`,
         variant: "destructive",
       });
-      // Re-throw if you need to handle it further up the chain, otherwise toast is user feedback
-      // throw new Error(errorMessage); 
     }
   }, [router, toast]);
 
@@ -128,26 +134,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
         email: values.email,
         tier: 'free',
         trialEndDate: Timestamp.fromDate(trialEndDate),
+        createdAt: Timestamp.now(), // Good practice to add creation timestamp
       });
       
       router.push('/');
+      // Toast for success is handled by the form if needed, or can be added here
     } catch (error) {
       setIsLoading(false);
+      let errorCode = "Unknown error";
       let errorMessage = "An unexpected error occurred during signup.";
-      // Firebase errors usually have a 'code' and 'message'
-      if (error instanceof Error && (error as any).code) {
-        errorMessage = `Error: ${(error as any).code} - ${error.message}`;
+
+      if (error instanceof Error && (error as AuthError).code) {
+        const firebaseError = error as AuthError;
+        errorCode = firebaseError.code;
+        errorMessage = firebaseError.message;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      console.error("Signup failed:", error); 
+      
+      console.error("Signup Failed:", errorCode, errorMessage, error); 
       toast({
         title: "Signup Failed",
-        description: errorMessage,
+        description: `Error: ${errorCode}. ${errorMessage}`,
         variant: "destructive",
       });
-      // Re-throw if you need to handle it further up the chain
-      // throw new Error(errorMessage);
     }
   }, [router, toast]);
 
@@ -164,14 +174,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             variant: "destructive"
         });
     } finally {
-        // onAuthStateChanged will set user to null and isLoading to false eventually
-        // but for immediate UI feedback on logout action, we can set isLoading here.
-        // However, relying on onAuthStateChanged is generally cleaner.
-        // For now, let onAuthStateChanged handle user and final loading state.
-        // If router.push('/login') happens before onAuthStateChanged fully processes,
-        // the login page might briefly show a loading state or the old user state.
-        // To be safe, let's ensure isLoading is false after attempting logout.
-        setIsLoading(false);
+        setIsLoading(false); // Explicitly set loading to false
     }
   }, [router, toast]);
 
@@ -181,3 +184,4 @@ export function AuthProvider({ children }: AuthProviderProps) {
     </AuthContext.Provider>
   );
 }
+
