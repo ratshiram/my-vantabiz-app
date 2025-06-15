@@ -205,8 +205,8 @@ export function InvoiceGeneratorClient() {
     let currentY = pageMargin;
 
     if (logoUrl && typeof logoUrl === 'string' && logoUrl.trim().startsWith('data:image/')) {
-      const currentLogoUrl = logoUrl; // Use a const for type narrowing
-      const imgTypeMatch = currentLogoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
+      const currentLogoUrlConst = logoUrl; 
+      const imgTypeMatch = currentLogoUrlConst.match(/^data:image\/(png|jpeg|jpg);base64,/);
       if (imgTypeMatch && imgTypeMatch[1]) {
         const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
         const image = new Image();
@@ -217,7 +217,7 @@ export function InvoiceGeneratorClient() {
               console.error("Image load error for PDF (generator):", errEvt);
               reject(new Error("Image load error for PDF generation: Failed to load logo."));
             };
-            image.src = currentLogoUrl;
+            image.src = currentLogoUrlConst;
           });
 
           const logoMaxHeight = 15;
@@ -235,7 +235,7 @@ export function InvoiceGeneratorClient() {
             imgHeight = logoMaxHeight;
             imgWidth = imgWidth * ratio;
           }
-          doc.addImage(currentLogoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
+          doc.addImage(currentLogoUrlConst, imgType, pageMargin, currentY, imgWidth, imgHeight);
           currentY += imgHeight + 5;
         } catch (imgLoadOrAddError) {
            toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
@@ -308,7 +308,7 @@ export function InvoiceGeneratorClient() {
     
     let tableEndY = (doc as any).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
-      tableEndY = currentY + (tableRowsData.length * 10) + 10; // Basic fallback
+      tableEndY = currentY + (tableRowsData.length * 10) + 10; 
     }
     currentY = tableEndY + 10;
 
@@ -320,7 +320,7 @@ export function InvoiceGeneratorClient() {
     currentY += 7;
 
     if (taxOption !== 'none' && taxAmount > 0) {
-      doc.text(`${taxLabel}:`, totalsX, currentY, { align: 'left' });
+      doc.text(`${taxLabel || 'Tax'}:`, totalsX, currentY, { align: 'left' });
       doc.text(`$${taxAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
       currentY += 7;
     }
@@ -522,3 +522,5 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
+
+    

@@ -32,8 +32,8 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     let currentY = pageMargin;
 
     if (invoice.logoUrl && typeof invoice.logoUrl === 'string' && invoice.logoUrl.trim().startsWith('data:image/')) {
-      const currentLogoUrl = invoice.logoUrl; // Use a const for type narrowing.
-      const imgTypeMatch = currentLogoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
+      const currentLogoUrlConst = invoice.logoUrl; 
+      const imgTypeMatch = currentLogoUrlConst.match(/^data:image\/(png|jpeg|jpg);base64,/);
       if (imgTypeMatch && imgTypeMatch[1]) {
         const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
         const image = new Image();
@@ -44,7 +44,11 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
               console.error("Image load error for PDF (list-table):", errEvt);
               reject(new Error("Image load error for PDF generation: Failed to load logo."));
             };
-            image.src = currentLogoUrl; // Assign the narrowed string here.
+            if (currentLogoUrlConst) { // Extra check to satisfy TypeScript strict null checks
+                image.src = currentLogoUrlConst;
+            } else {
+                reject(new Error("Logo URL is null or undefined before assigning to image.src"));
+            }
           });
 
           const logoMaxHeight = 15;
@@ -63,7 +67,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
             imgWidth = imgWidth * ratio;
           }
           
-          doc.addImage(currentLogoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
+          doc.addImage(currentLogoUrlConst, imgType, pageMargin, currentY, imgWidth, imgHeight);
           currentY += imgHeight + 5;
         } catch (imgLoadOrAddError) {
            toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
@@ -138,7 +142,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     
     let tableEndY = (doc as any).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
-      tableEndY = mainTableStartY + (tableRowsData.length * 10) + 10; // Basic fallback
+      tableEndY = mainTableStartY + (tableRowsData.length * 10) + 10; 
     }
     currentY = tableEndY + 10;
 
@@ -155,7 +159,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
         const rateDisplay = (invoice.taxInfo.rate * 100).toFixed(invoice.taxInfo.rate === 0.14975 ? 3 : (invoice.taxInfo.rate * 100 % 1 === 0 ? 0 : 1) );
         taxLabel = `Tax (${invoice.taxInfo.location} @ ${rateDisplay}%)`;
       }
-      doc.text(`${taxLabel}:`, totalsX, currentY, { align: 'left'});
+      doc.text(`${taxLabel || 'Tax'}:`, totalsX, currentY, { align: 'left'});
       doc.text(`$${invoice.taxInfo.amount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
       currentY += 7;
     }
@@ -194,7 +198,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
                 <TableRow key={invoice.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell>{invoice.receiptNumber}</TableCell>
                   <TableCell>{invoice.clientName}</TableCell>
-                  <TableCell>{format(invoice.paymentDate, "MMM d, yyyy")}</TableCell>
+                  <TableCell>{format(new Date(invoice.paymentDate), "MMM d, yyyy")}</TableCell>
                   <TableCell className="text-right font-medium">${invoice.totalAmount.toFixed(2)}</TableCell>
                   <TableCell className="text-center">
                     <Button
@@ -216,3 +220,5 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     </Card>
   );
 }
+
+    
