@@ -44,7 +44,6 @@ const tiers = [
   },
 ];
 
-// Initialize Stripe.js with your publishable key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
 
@@ -89,7 +88,6 @@ export default function PricingPage() {
         description: "Please log in or sign up to upgrade to Pro.",
         variant: "destructive",
       });
-      // Optionally, redirect to login: router.push('/login');
       return;
     }
 
@@ -118,13 +116,8 @@ export default function PricingPage() {
         throw new Error('Stripe.js failed to load. Please check your internet connection or ad-blockers.');
       }
 
-      // This is where the error "Failed to set a named property 'href' on 'Location'" occurs
-      // if the redirect is blocked by the browser (e.g. in a sandboxed iframe).
-      // Such an error will be caught by the outer try-catch block.
       const { error: stripeJsError } = await stripe.redirectToCheckout({ sessionId });
 
-      // This 'stripeJsError' is an error object returned by Stripe.js if it identifies an issue
-      // *before* attempting the actual redirection (e.g., invalid session ID).
       if (stripeJsError) {
         console.error("Stripe.js reported an error before redirect:", stripeJsError);
         toast({
@@ -133,11 +126,10 @@ export default function PricingPage() {
           variant: "destructive",
         });
       }
-    } catch (error) { // Catches errors from fetch, or if redirectToCheckout *throws* an exception (like the 'href' error)
+    } catch (error) { 
       console.error("Go Pro error during API call or redirect:", error);
       let description = "An unexpected error occurred. Please try again.";
       if (error instanceof Error) {
-        // Check for the specific "href" error message
         if (error.message && error.message.includes("Failed to set a named property 'href' on 'Location'")) {
             description = "Could not redirect to Stripe. This can happen due to restrictions in the current browsing environment (e.g., running in an iframe without top-navigation permission). If possible, try completing this action in a new, standalone browser tab or window.";
         } else {
