@@ -27,7 +27,7 @@ interface TransactionsTableProps {
 export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const [startDate, setStartDate] = React.useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = React.useState<Date | undefined>(undefined);
-  const { toast } = useToast(); 
+  const { toast } = useToast();
 
   const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -36,7 +36,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
 
     const doc = new jsPDF();
     const pageMargin = 14;
-    let currentY = pageMargin; 
+    let currentY = pageMargin;
 
     const filteredTransactions = sortedTransactions.filter(transaction => {
       const transactionDate = new Date(transaction.date);
@@ -58,7 +58,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     const profitOrLoss = totalIncome - totalExpenses;
 
     doc.setFontSize(18);
-    doc.text("Transaction Report", pageMargin, currentY + 8); 
+    doc.text("Transaction Report", pageMargin, currentY + 8);
     currentY += 8;
     doc.setFontSize(10);
     doc.setTextColor(100);
@@ -91,12 +91,12 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       tableRows.push(transactionData);
     });
     
-    const mainTableStartY = currentY + 6; 
+    const mainTableStartY = currentY + 6;
 
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: mainTableStartY, 
+      startY: mainTableStartY,
       theme: 'striped',
       headStyles: { fillColor: [22, 160, 133] },
       alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -112,14 +112,13 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
 
     let tableEndY = (doc as any).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
-      // Fallback if autoTable didn't return a valid Y or if no table was drawn
-      tableEndY = mainTableStartY + (tableRows.length > 0 ? tableRows.length * 10 : 10); 
+      tableEndY = mainTableStartY + (tableRows.length > 0 ? tableRows.length * 10 : 0) + 10;
     }
-    currentY = tableEndY; 
+    currentY = tableEndY;
 
     doc.setFontSize(12);
-    doc.setTextColor(0); 
-    doc.text("Summary:", pageMargin, currentY + 10); 
+    doc.setTextColor(0);
+    doc.text("Summary:", pageMargin, currentY + 10);
     
     const summaryData = [
         ["Total Income:", `$${totalIncome.toFixed(2)}`],
@@ -127,18 +126,16 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
         ["Profit / Loss:", `$${profitOrLoss.toFixed(2)}`]
     ];
     
-    const summaryTableStartY = currentY + 15; 
+    const summaryTableStartY = currentY + 15;
     
     let pageWidthForSummary = doc.internal.pageSize.getWidth();
     if (typeof pageWidthForSummary !== 'number' || pageWidthForSummary <= 0) {
-        console.error("Invalid pageWidth for PDF summary:", pageWidthForSummary);
-        toast({ title: "PDF Error", description: "Could not determine page width for PDF summary.", variant: "destructive" });
-        pageWidthForSummary = 210; // Default to A4 width as a fallback
+        pageWidthForSummary = 210; 
     }
 
-    let summaryTableMarginLeft = Math.max(pageMargin, pageWidthForSummary - 80 - pageMargin); 
+    let summaryTableMarginLeft = Math.max(pageMargin, pageWidthForSummary - 80 - pageMargin);
     if (typeof summaryTableMarginLeft !== 'number' || isNaN(summaryTableMarginLeft) || summaryTableMarginLeft < 0) {
-        summaryTableMarginLeft = pageMargin; // Fallback margin
+        summaryTableMarginLeft = pageMargin; 
     }
 
 
@@ -152,7 +149,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
             1: { halign: 'right' }
         },
         tableWidth: 'wrap',
-        margin: {left: summaryTableMarginLeft } 
+        margin: {left: summaryTableMarginLeft }
     });
     
     doc.save("Financial-Report.pdf");
@@ -183,7 +180,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                 mode="single"
                 selected={startDate}
                 onSelect={setStartDate}
-                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                disabled={(date) => !!(date > new Date() || date < new Date("1900-01-01"))}
                 initialFocus
               />
             </PopoverContent>
@@ -206,15 +203,15 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                 mode="single"
                 selected={endDate}
                 onSelect={setEndDate}
-                disabled={(date) => date > new Date() || date < new Date("1900-01-01") || (startDate && date < startDate)}
+                disabled={(date) => !!(date > new Date() || date < new Date("1900-01-01") || (startDate && date < startDate))}
                 initialFocus
               />
             </PopoverContent>
           </Popover>
-          <Button 
-            onClick={handleDownloadReport} 
-            variant="default" 
-            size="sm" 
+          <Button
+            onClick={handleDownloadReport}
+            variant="default"
+            size="sm"
             disabled={transactions.length === 0}
             className="w-full sm:w-auto"
           >
@@ -237,13 +234,17 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
             <TableBody>
               {sortedTransactions.length > 0 ? (
                 sortedTransactions.map((t) => {
-                  const iconElement = categoryIconsMap.get(t.category);
+                  const iconNode = categoryIconsMap.get(t.category);
                   return (
                     <TableRow key={t.id} className="hover:bg-muted/50 transition-colors">
                       <TableCell className="px-4">{format(new Date(t.date), "MMM d, yyyy")}</TableCell>
                       <TableCell className="px-4">{t.description}</TableCell>
                       <TableCell className="flex items-center px-4">
-                        {React.isValidElement(iconElement) ? React.cloneElement(iconElement, { className: "mr-2 h-4 w-4 text-muted-foreground" }) : null}
+                        {React.isValidElement(iconNode)
+                          ? React.cloneElement(iconNode as React.ReactElement<{className?: string}>, {
+                              className: "mr-2 h-4 w-4 text-muted-foreground",
+                            })
+                          : null}
                         <span>{t.category}</span>
                       </TableCell>
                       <TableCell
@@ -270,4 +271,3 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     </Card>
   );
 }
-

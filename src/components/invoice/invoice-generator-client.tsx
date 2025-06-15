@@ -20,6 +20,26 @@ import { format } from 'date-fns';
 const canadianTaxRates: Record<string, number> = { AB: 0.05,BC: 0.12,MB: 0.12,NB: 0.15,NL: 0.15,NT: 0.05,NS: 0.15,NU: 0.05,ON: 0.13,PE: 0.15,QC: 0.14975,SK: 0.11,YT: 0.05 };
 const provinces = Object.keys(canadianTaxRates).map(p => ({ value: p, label: `${p} (${(canadianTaxRates[p]*100).toFixed(canadianTaxRates[p] === 0.14975 ? 3:0)}%)`}));
 
+// Type for data being written to Firestore, allowing Firestore Timestamps
+interface InvoiceWriteData {
+  id: string;
+  userId: string;
+  businessName: string;
+  businessAddress: string;
+  taxId?: string;
+  logoUrl?: string | null;
+  clientName: string;
+  clientAddress: string;
+  receiptNumber: string;
+  paymentDate: Timestamp; // Firestore Timestamp for writing
+  services: Array<{ description: string; amount: number }>;
+  subtotal: number;
+  taxInfo: ClientTaxInfo;
+  totalAmount: number;
+  createdAt: Timestamp; // Firestore Timestamp for writing
+}
+
+
 export function InvoiceGeneratorClient() {
   const { toast } = useToast();
   const { user, isLoading: authLoading, updateUserBusinessDetails } = useAuth();
@@ -37,7 +57,7 @@ export function InvoiceGeneratorClient() {
 
   const [serviceItems, setServiceItems] = React.useState<ClientServiceItem[]>([{ id: crypto.randomUUID(), description: '', amount: 0 }]);
   const [taxOption, setTaxOption] = React.useState('none');
-  const [provinceTax, setProvinceTax] = React.useState('NL'); 
+  const [provinceTax, setProvinceTax] = React.useState('NL');
   const [paymentDate, setPaymentDate] = React.useState('');
   const [receiptNumber, setReceiptNumber] = React.useState('');
 
@@ -47,7 +67,7 @@ export function InvoiceGeneratorClient() {
   React.useEffect(() => {
     setIsClient(true);
     setPaymentDate(new Date().toISOString().split('T')[0]);
-    setReceiptNumber(`RCPT-${Date.now().toString().slice(-6)}`); 
+    setReceiptNumber(`RCPT-${Date.now().toString().slice(-6)}`);
     if (serviceItems.length === 0) {
       addServiceItem();
     }
@@ -78,7 +98,7 @@ export function InvoiceGeneratorClient() {
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 1 * 1024 * 1024) { 
+      if (file.size > 1 * 1024 * 1024) {
         toast({ title: "Logo Too Large", description: "Please upload a logo smaller than 1MB.", variant: "destructive" });
         return;
       }
@@ -106,12 +126,12 @@ export function InvoiceGeneratorClient() {
   };
 
   const generatePreview = () => {
-    if (!businessName || !clientName || serviceItems.length === 0 || 
-        !serviceItems.every(s => s.description.trim() && s.amount >= 0) || 
+    if (!businessName || !clientName || serviceItems.length === 0 ||
+        !serviceItems.every(s => s.description.trim() && s.amount >= 0) ||
         !paymentDate || !receiptNumber) {
-        toast({ 
-            title: "Missing Information", 
-            description: "Please fill all required fields: Business Name, Client Name, Payment Date, Receipt Number, and ensure every service item has a description and a valid amount.", 
+        toast({
+            title: "Missing Information",
+            description: "Please fill all required fields: Business Name, Client Name, Payment Date, Receipt Number, and ensure every service item has a description and a valid amount.",
             variant: "destructive"
         });
         setCanDownload(false);
@@ -129,8 +149,8 @@ export function InvoiceGeneratorClient() {
     }
     tfootHtml += `<tr style="font-weight: bold; color: #111827;"><td style="padding-top: 8px; padding-right: 16px; text-align: right;">Total Paid</td><td style="text-align: right; padding-top: 8px; padding-left: 16px;">$${totalAmount.toFixed(2)}</td></tr>`;
     
-    const logoDisplayHtml = (logoUrl && typeof logoUrl === 'string' && logoUrl.trim().startsWith('data:image/')) 
-      ? `<img src="${logoUrl}" alt="Business Logo" style="margin-bottom: 1rem; max-height: 4rem; max-width: 10rem; object-fit: contain;">` 
+    const logoDisplayHtml = (logoUrl && typeof logoUrl === 'string' && logoUrl.trim().startsWith('data:image/'))
+      ? `<img src="${logoUrl}" alt="Business Logo" style="margin-bottom: 1rem; max-height: 4rem; max-width: 10rem; object-fit: contain;">`
       : '';
     
     const html = `<div style="font-family: 'Inter', Arial, sans-serif; font-size: 12px; padding: 20px; color: #374151; max-width: 800px; margin: auto; border: 1px solid #e5e7eb; background: white;">
@@ -185,7 +205,8 @@ export function InvoiceGeneratorClient() {
     let currentY = pageMargin;
 
     if (logoUrl && typeof logoUrl === 'string' && logoUrl.trim().startsWith('data:image/')) {
-      const imgTypeMatch = logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
+      const currentLogoUrl = logoUrl; // Use a const for type narrowing
+      const imgTypeMatch = currentLogoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
       if (imgTypeMatch && imgTypeMatch[1]) {
         const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
         const image = new Image();
@@ -194,9 +215,9 @@ export function InvoiceGeneratorClient() {
             image.onload = () => resolve();
             image.onerror = (errEvt) => {
               console.error("Image load error for PDF (generator):", errEvt);
-              reject(new Error("Image load error for PDF generation")); 
+              reject(new Error("Image load error for PDF generation: Failed to load logo."));
             };
-            image.src = logoUrl;
+            image.src = currentLogoUrl;
           });
 
           const logoMaxHeight = 15;
@@ -214,7 +235,7 @@ export function InvoiceGeneratorClient() {
             imgHeight = logoMaxHeight;
             imgWidth = imgWidth * ratio;
           }
-          doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
+          doc.addImage(currentLogoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
           currentY += imgHeight + 5;
         } catch (imgLoadOrAddError) {
            toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
@@ -227,10 +248,10 @@ export function InvoiceGeneratorClient() {
     }
     
     doc.setFontSize(18);
-    doc.text(businessName || "Your Business Name", pageMargin, currentY);
+    doc.text(businessName || "", pageMargin, currentY);
     currentY += 7;
     doc.setFontSize(10);
-    doc.text(businessAddress || "Your Business Address", pageMargin, currentY);
+    doc.text(businessAddress || "", pageMargin, currentY);
     currentY += 5;
     if (businessTaxId) {
       doc.text(`Tax ID: ${businessTaxId}`, pageMargin, currentY);
@@ -238,12 +259,12 @@ export function InvoiceGeneratorClient() {
     }
 
     const receiptInfoX = pageWidth - pageMargin;
-    let receiptBlockY = pageMargin; 
+    let receiptBlockY = pageMargin;
     if (logoUrl && typeof logoUrl === 'string' && logoUrl.trim().startsWith('data:image/')) {
         // currentY might have advanced if logo was successfully added
     } else {
         // If no logo or logo failed, ensure receiptBlockY aligns with business info
-        receiptBlockY = Math.max(pageMargin, currentY - (businessTaxId ? 17 : 12) ); 
+        receiptBlockY = Math.max(pageMargin, currentY - (businessTaxId ? 17 : 12) );
     }
 
 
@@ -253,7 +274,7 @@ export function InvoiceGeneratorClient() {
     doc.text(`#${receiptNumber || 'RCPT-XXXX'}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
     doc.text(`Date: ${formattedPaymentDate}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
-    currentY = Math.max(currentY, receiptBlockY + 25); 
+    currentY = Math.max(currentY, receiptBlockY + 25);
 
     currentY += 10;
     doc.setFontSize(8).setTextColor(100);
@@ -261,10 +282,10 @@ export function InvoiceGeneratorClient() {
     currentY += 4;
     doc.setFontSize(10).setTextColor(0);
     doc.setFont(undefined, 'bold');
-    doc.text(clientName || "Client Name", pageMargin, currentY);
+    doc.text(clientName || "", pageMargin, currentY);
     currentY += 5;
     doc.setFont(undefined, 'normal');
-    doc.text(clientAddress || "Client Address", pageMargin, currentY);
+    doc.text(clientAddress || "", pageMargin, currentY);
     currentY += 10;
 
     const tableColumn = ["Description", "Amount"];
@@ -278,7 +299,7 @@ export function InvoiceGeneratorClient() {
       body: tableRowsData,
       startY: currentY,
       theme: 'striped',
-      headStyles: { fillColor: [70, 128, 144] }, 
+      headStyles: { fillColor: [70, 128, 144] },
       columnStyles: {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
@@ -287,12 +308,12 @@ export function InvoiceGeneratorClient() {
     
     let tableEndY = (doc as any).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
-      tableEndY = currentY + (tableRowsData.length * 10); // Basic fallback
+      tableEndY = currentY + (tableRowsData.length * 10) + 10; // Basic fallback
     }
     currentY = tableEndY + 10;
 
 
-    const totalsX = pageWidth - pageMargin - 70; 
+    const totalsX = pageWidth - pageMargin - 70;
     doc.setFontSize(10);
     doc.text("Subtotal:", totalsX, currentY, { align: 'left' });
     doc.text(`$${subtotal.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
@@ -325,9 +346,9 @@ export function InvoiceGeneratorClient() {
     const { subtotal, taxAmount, totalAmount, taxInfoForDoc } = calculateTotals();
     const invoiceId = crypto.randomUUID();
     
-    const localPaymentDate = new Date(paymentDate ? paymentDate + 'T00:00:00' : Date.now()); 
+    const localPaymentDate = new Date(paymentDate ? paymentDate + 'T00:00:00' : Date.now());
     
-    const invoiceBaseData = {
+    const dataToSave: InvoiceWriteData = {
       id: invoiceId,
       userId: user.id,
       businessName,
@@ -335,23 +356,19 @@ export function InvoiceGeneratorClient() {
       clientName,
       clientAddress,
       receiptNumber,
-      paymentDate: Timestamp.fromDate(localPaymentDate), 
+      paymentDate: Timestamp.fromDate(localPaymentDate),
       services: serviceItems.map(s => ({ description: s.description, amount: Number(s.amount) })),
       subtotal,
       taxInfo: taxInfoForDoc,
       totalAmount,
       createdAt: Timestamp.now(),
-      logoUrl: (logoUrl && typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl : null, 
-    };
-
-    const invoiceToSave: InvoiceDocument = {
-        ...invoiceBaseData,
-        ...(businessTaxId && businessTaxId.trim() && { taxId: businessTaxId.trim() }),
+      logoUrl: (logoUrl && typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl : null,
+      ...(businessTaxId && businessTaxId.trim() && { taxId: businessTaxId.trim() }),
     };
 
 
     try {
-      await setDoc(doc(db, "invoices", invoiceId), invoiceToSave);
+      await setDoc(doc(db, "invoices", invoiceId), dataToSave);
       toast({ title: "Invoice Saved", description: "Your invoice has been successfully saved to your account." });
     } catch (error) {
       console.error("Error saving invoice:", error);
@@ -376,7 +393,6 @@ export function InvoiceGeneratorClient() {
       });
     } catch (error) {
       console.error("Failed to save business info from client:", error);
-      // Toast for failure is handled within updateUserBusinessDetails or here if needed
     } finally {
       setIsSavingBusinessInfo(false);
     }
@@ -403,10 +419,10 @@ export function InvoiceGeneratorClient() {
             <div>
               <div className="flex justify-between items-center border-b pb-2 mb-4">
                 <h3 className="text-xl font-semibold text-foreground">1. Your Information</h3>
-                <Button 
-                  type="button" 
-                  onClick={handleSaveBusinessInfo} 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  onClick={handleSaveBusinessInfo}
+                  variant="outline"
                   size="sm"
                   disabled={isSavingBusinessInfo}
                   title="Save your business details for next time"
@@ -482,17 +498,17 @@ export function InvoiceGeneratorClient() {
             <CardTitle className="text-xl">Receipt Preview</CardTitle>
           </CardHeader>
           <div className="flex flex-col sm:flex-row justify-center items-center gap-3 p-4 border-b">
-            <Button 
-              onClick={handleSaveInvoice} 
-              disabled={!canDownload || isSavingInvoice || !user} 
+            <Button
+              onClick={handleSaveInvoice}
+              disabled={!canDownload || isSavingInvoice || !user}
               className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white py-3 text-base"
             >
               {isSavingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               {isSavingInvoice ? "Saving..." : "Save Invoice"}
             </Button>
-            <Button 
-              onClick={handleDownloadPdf} 
-              disabled={!canDownload} 
+            <Button
+              onClick={handleDownloadPdf}
+              disabled={!canDownload}
               className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground py-3 text-base"
             >
               <Download className="mr-2 h-4 w-4" /> Download PDF

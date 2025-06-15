@@ -19,17 +19,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: '2024-04-10', 
+      apiVersion: '2024-06-20',
     });
 
     const body: { userId?: string } = await req.json();
-    const userId = body.userId; 
+    const userId = body.userId;
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required.' }, { status: 400 });
     }
     
-    const origin = req.headers.get('origin') || 'http://localhost:9002'; 
+    const origin = req.headers.get('origin') || 'http://localhost:9002';
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -39,10 +39,10 @@ export async function POST(req: NextRequest) {
           quantity: 1,
         },
       ],
-      mode: 'subscription', 
-      success_url: `${origin}/profile?session_id={CHECKOUT_SESSION_ID}`, 
-      cancel_url: `${origin}/pricing`, 
-      client_reference_id: userId, 
+      mode: 'subscription',
+      success_url: `${origin}/profile?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/pricing`,
+      client_reference_id: userId,
     });
 
     if (!session.id) {

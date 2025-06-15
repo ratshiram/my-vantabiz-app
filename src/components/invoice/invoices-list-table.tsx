@@ -3,14 +3,14 @@
 
 import React from 'react';
 import { format } from "date-fns";
-import { Download } from "lucide-react"; 
+import { Download } from "lucide-react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { InvoiceDocument } from "@/lib/types"; 
+import type { InvoiceDocument } from "@/lib/types";
 import { useToast } from '@/hooks/use-toast';
 
 interface InvoicesListTableProps {
@@ -32,18 +32,19 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     let currentY = pageMargin;
 
     if (invoice.logoUrl && typeof invoice.logoUrl === 'string' && invoice.logoUrl.trim().startsWith('data:image/')) {
-      const imgTypeMatch = invoice.logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
+      const currentLogoUrl = invoice.logoUrl; // Use a const for type narrowing.
+      const imgTypeMatch = currentLogoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
       if (imgTypeMatch && imgTypeMatch[1]) {
         const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
         const image = new Image();
         try {
           await new Promise<void>((resolve, reject) => {
             image.onload = () => resolve();
-            image.onerror = (errEvt) => { 
+            image.onerror = (errEvt) => {
               console.error("Image load error for PDF (list-table):", errEvt);
-              reject(new Error("Image load error for PDF generation")); 
+              reject(new Error("Image load error for PDF generation: Failed to load logo."));
             };
-            image.src = invoice.logoUrl;
+            image.src = currentLogoUrl; // Assign the narrowed string here.
           });
 
           const logoMaxHeight = 15;
@@ -62,7 +63,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
             imgWidth = imgWidth * ratio;
           }
           
-          doc.addImage(invoice.logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
+          doc.addImage(currentLogoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
           currentY += imgHeight + 5;
         } catch (imgLoadOrAddError) {
            toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
@@ -76,10 +77,10 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
 
 
     doc.setFontSize(18);
-    doc.text(invoice.businessName, pageMargin, currentY);
+    doc.text(invoice.businessName || "", pageMargin, currentY);
     currentY += 7;
     doc.setFontSize(10);
-    doc.text(invoice.businessAddress, pageMargin, currentY);
+    doc.text(invoice.businessAddress || "", pageMargin, currentY);
     currentY += 5;
     if (invoice.taxId) {
       doc.text(`Tax ID: ${invoice.taxId}`, pageMargin, currentY);
@@ -92,17 +93,17 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
         // currentY might have advanced if logo was successfully added
     } else {
         // If no logo or logo failed, ensure receiptBlockY aligns with business info
-        receiptBlockY = Math.max(pageMargin, currentY - (invoice.taxId ? 17 : 12) ); 
+        receiptBlockY = Math.max(pageMargin, currentY - (invoice.taxId ? 17 : 12) );
     }
 
 
     doc.setFontSize(14).setFont(undefined, 'bold');
     doc.text("RECEIPT", receiptInfoX, receiptBlockY + 5, { align: 'right' });
     doc.setFontSize(10).setFont(undefined, 'normal');
-    doc.text(`#${invoice.receiptNumber}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
+    doc.text(`#${invoice.receiptNumber || ""}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
     doc.text(`Date: ${format(invoice.paymentDate, "MMMM d, yyyy")}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
-    currentY = Math.max(currentY, receiptBlockY + 25); 
+    currentY = Math.max(currentY, receiptBlockY + 25);
 
     currentY += 10;
     doc.setFontSize(8).setTextColor(100);
@@ -110,10 +111,10 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     currentY += 4;
     doc.setFontSize(10).setTextColor(0);
     doc.setFont(undefined, 'bold');
-    doc.text(invoice.clientName, pageMargin, currentY);
+    doc.text(invoice.clientName || "", pageMargin, currentY);
     currentY += 5;
     doc.setFont(undefined, 'normal');
-    doc.text(invoice.clientAddress, pageMargin, currentY);
+    doc.text(invoice.clientAddress || "", pageMargin, currentY);
     currentY += 10;
 
     const tableColumn = ["Description", "Amount"];
@@ -128,7 +129,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
       body: tableRowsData,
       startY: mainTableStartY,
       theme: 'striped',
-      headStyles: { fillColor: [70, 128, 144] }, 
+      headStyles: { fillColor: [70, 128, 144] },
       columnStyles: {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
@@ -137,12 +138,12 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     
     let tableEndY = (doc as any).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
-      tableEndY = mainTableStartY + (tableRowsData.length * 10); // Basic fallback
+      tableEndY = mainTableStartY + (tableRowsData.length * 10) + 10; // Basic fallback
     }
     currentY = tableEndY + 10;
 
 
-    const totalsX = pageWidth - pageMargin - 70; 
+    const totalsX = pageWidth - pageMargin - 70;
     doc.setFontSize(10);
     doc.text("Subtotal:", totalsX, currentY, { align: 'left' });
     doc.text(`$${invoice.subtotal.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
@@ -163,12 +164,12 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     doc.text("Total Paid:", totalsX, currentY, { align: 'left'});
     doc.text(`$${invoice.totalAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
 
-    doc.save(`Receipt-${invoice.receiptNumber}.pdf`);
-    toast({ title: "PDF Downloaded", description: `Invoice ${invoice.receiptNumber} PDF has been generated.`});
+    doc.save(`Receipt-${invoice.receiptNumber || "unknown"}.pdf`);
+    toast({ title: "PDF Downloaded", description: `Invoice ${invoice.receiptNumber || ""} PDF has been generated.`});
   };
   
   if (!invoices || invoices.length === 0) {
-    return null; 
+    return null;
   }
 
   return (
@@ -196,9 +197,9 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
                   <TableCell>{format(invoice.paymentDate, "MMM d, yyyy")}</TableCell>
                   <TableCell className="text-right font-medium">${invoice.totalAmount.toFixed(2)}</TableCell>
                   <TableCell className="text-center">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleDownloadInvoicePdf(invoice)}
                       title="Download PDF"
                     >
