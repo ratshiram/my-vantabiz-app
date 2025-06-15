@@ -9,7 +9,7 @@ export function AppHeader() {
         <Image
           src="/vantabizlogo.png"
           alt="VantaBiz Logo"
-          width={200}
+          width={150}
           height={50}
           style={{ objectFit: 'contain', width: 'auto', height: '100%' }}
           priority
