@@ -3,26 +3,19 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export function AppHeader() {
-  // Assuming vantabiz.png has an intrinsic aspect ratio.
-  // These are placeholder dimensions for aspect ratio calculation if needed.
-  // For best results, these should match the actual logo's dimensions.
-  const intrinsicWidth = 176; // Example
-  const intrinsicHeight = 48;  // Example
-
   return (
     <header className="text-center py-6 sm:py-8 bg-card border-b border-border">
       <Link href="/" className="inline-block group" aria-label="VantaBiz Home">
-        {/* This div controls the size of the logo via height and aspect ratio */}
+        {/* This div controls the size of the logo via height */}
         <div
-          className="relative h-20 w-auto sm:h-24" // Increased height
-          style={{ aspectRatio: `${intrinsicWidth}/${intrinsicHeight}` }} // Aspect ratio helps maintain shape
+          className="relative h-24 w-auto sm:h-32" // Increased height further
         >
           <Image
             src="/vantabiz.png" // Points to public/vantabiz.png
             alt="VantaBiz Logo"
             fill
-            style={{ objectFit: "contain" }}
-            priority
+            style={{ objectFit: "contain" }} // Ensures the image scales within the bounds without distortion
+            priority // Prioritize loading the logo
           />
         </div>
       </Link>
