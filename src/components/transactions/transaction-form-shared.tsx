@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect } from 'react';
@@ -53,7 +54,7 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       description: "",
-      amount: undefined,
+      amount: '' as unknown as number, // Initialize with empty string for controlled input
       category: "",
       date: undefined, 
     },
@@ -63,12 +64,13 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
     if (clientDefaultDate) {
       form.reset({
         description: "",
-        amount: undefined,
+        amount: '' as unknown as number, // Reset with empty string
         category: "",
         date: clientDefaultDate,
       });
     }
-  }, [clientDefaultDate, form.reset, form ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientDefaultDate, form.reset ]); // form was missing from dependency array, added form.reset
 
 
   const categories = type === "income" ? incomeCategories : expenseCategories;
@@ -77,13 +79,13 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
     onSubmit(values);
     toast({
       title: `${type.charAt(0).toUpperCase() + type.slice(1)} Added`,
-      description: `${values.description} - $${values.amount.toFixed(2)}`,
+      description: `${values.description} - $${Number(values.amount).toFixed(2)}`,
       variant: "default",
     });
     if (clientDefaultDate) {
        form.reset({
         description: "",
-        amount: undefined,
+        amount: '' as unknown as number, // Reset with empty string
         category: "",
         date: clientDefaultDate,
       });
@@ -148,7 +150,14 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
             <FormItem>
               <FormLabel>Amount</FormLabel>
               <FormControl>
-                <Input type="number" placeholder={type === 'income' ? "850.00" : "75.50"} step="0.01" {...field} />
+                <Input 
+                  type="number" 
+                  placeholder={type === 'income' ? "850.00" : "75.50"} 
+                  step="0.01" 
+                  {...field} 
+                  value={field.value === undefined || field.value === null || Number.isNaN(field.value) ? '' : String(field.value)}
+                  onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -160,7 +169,7 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value || ""}> {/* Ensure value is not undefined */}
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a category" />
