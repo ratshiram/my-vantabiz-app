@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, FileText, Tags, UserCircle, LogIn, UserPlus, LogOut, Settings } from 'lucide-react';
+import { LayoutDashboard, FileText, Tags, UserCircle, LogIn, UserPlus, LogOut, Settings, ListChecks } from 'lucide-react'; // Added ListChecks
 import { useAuth } from '@/hooks/use-auth';
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 const navItems = [
   { href: '/', label: 'FinTrack', icon: <LayoutDashboard className="mr-2 h-5 w-5" /> },
   { href: '/invoice-generator', label: 'Invoice Gen', icon: <FileText className="mr-2 h-5 w-5" /> },
+  { href: '/my-invoices', label: 'My Invoices', icon: <ListChecks className="mr-2 h-5 w-5" /> }, // New Nav Item
   { href: '/pricing', label: 'Pricing', icon: <Tags className="mr-2 h-5 w-5" /> },
 ];
 

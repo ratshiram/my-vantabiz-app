@@ -37,19 +37,17 @@ export function InvoiceGeneratorClient() {
 
   const [serviceItems, setServiceItems] = useState<ClientServiceItem[]>([{ id: crypto.randomUUID(), description: '', amount: 0 }]);
   const [taxOption, setTaxOption] = useState('none');
-  const [provinceTax, setProvinceTax] = useState('NL');
+  const [provinceTax, setProvinceTax] = useState('NL'); // Default to NL for example
   const [paymentDate, setPaymentDate] = useState('');
   const [receiptNumber, setReceiptNumber] = useState('');
 
-  const [previewHtml, setPreviewHtml] = useState<string>('<div class="text-center h-full flex items-center justify-center text-muted-foreground"><p>Receipt preview appears here</p></div>');
+  const [previewHtml, setPreviewHtml] = useState<string>('<div class="text-center h-full flex items-center justify-center text-muted-foreground"><p>Receipt preview appears here after filling the form and clicking "Generate & Preview".</p></div>');
   const [canDownload, setCanDownload] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    // Ensure date operations are client-side only or handled to avoid hydration mismatch
-    // These are safe as they don't directly render different values server/client immediately
     setPaymentDate(new Date().toISOString().split('T')[0]);
-    setReceiptNumber(`RCPT-${Date.now()}`);
+    setReceiptNumber(`RCPT-${Date.now().toString().slice(-6)}`); // Shorter receipt number
     if (serviceItems.length === 0) {
       addServiceItem();
     }
@@ -91,7 +89,7 @@ export function InvoiceGeneratorClient() {
   };
 
   const calculateTotals = () => {
-    const subtotal = serviceItems.reduce((sum, item) => sum + Number(item.amount), 0);
+    const subtotal = serviceItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     let taxRate = 0;
     let taxAmount = 0;
     let taxLabel = 'No Tax';
@@ -100,7 +98,7 @@ export function InvoiceGeneratorClient() {
     if (taxOption === 'ca' && provinceTax && canadianTaxRates[provinceTax]) {
       taxRate = canadianTaxRates[provinceTax];
       taxAmount = subtotal * taxRate;
-      taxLabel = `Tax (${provinceTax} @ ${(taxRate * 100).toFixed(canadianTaxRates[provinceTax] === 0.14975 ? 3:0)}%)`;
+      taxLabel = `Tax (${provinceTax} @ ${(taxRate * 100).toFixed(canadianTaxRates[provinceTax] === 0.14975 ? 3:(taxRate * 100 % 1 === 0 ? 0 : 1))}%)`;
       taxInfoForDoc = { option: 'ca', location: provinceTax, rate: taxRate, amount: taxAmount };
     }
     const totalAmount = subtotal + taxAmount;
@@ -109,7 +107,7 @@ export function InvoiceGeneratorClient() {
 
   const generatePreview = () => {
     if (!businessName || !clientName || serviceItems.length === 0 || 
-        !serviceItems.every(s => s.description && s.amount >= 0) || 
+        !serviceItems.every(s => s.description.trim() && s.amount >= 0) || // Ensure description is not just whitespace
         !paymentDate || !receiptNumber) {
         toast({ 
             title: "Missing Information", 
@@ -117,10 +115,11 @@ export function InvoiceGeneratorClient() {
             variant: "destructive"
         });
         setCanDownload(false);
+        setPreviewHtml('<div class="text-center h-full flex items-center justify-center text-destructive-foreground p-4 bg-destructive/10 rounded-md"><p>Preview generation failed. Please check all required fields.</p></div>');
         return;
     }
     const { subtotal, taxAmount, totalAmount, taxLabel } = calculateTotals();
-    const formattedDate = paymentDate ? new Date(paymentDate + 'T00:00:00Z').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+    const formattedDate = paymentDate ? format(new Date(paymentDate + 'T00:00:00'), 'MMMM d, yyyy') : 'N/A';
     
     const servicesHtml = serviceItems.map(s => `<tr><td style="padding: 8px 16px 8px 0; border-bottom: 1px solid #eee; word-break: break-word;">${s.description || 'N/A'}</td><td style="text-align: right; padding: 8px 0 8px 16px; border-bottom: 1px solid #eee;">$${Number(s.amount).toFixed(2)}</td></tr>`).join('');
     
@@ -166,45 +165,49 @@ export function InvoiceGeneratorClient() {
                   </div>`;
     setPreviewHtml(html);
     setCanDownload(true);
-    toast({ title: "Preview Updated", description: "Receipt preview has been generated."});
+    toast({ title: "Preview Updated", description: "Receipt preview has been generated. You can now save or download."});
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!canDownload || typeof window === 'undefined') return;
-    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0) || !paymentDate || !receiptNumber) {
+    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description.trim() && s.amount >= 0) || !paymentDate || !receiptNumber) {
         toast({ title: "Incomplete Form", description: "Please fill all required fields and add at least one valid service item.", variant: "destructive"});
         return;
     }
 
     const doc = new jsPDF();
     const { subtotal, taxAmount, totalAmount, taxLabel } = calculateTotals();
-    const formattedPaymentDate = paymentDate ? format(new Date(paymentDate + 'T00:00:00Z'), "MMMM d, yyyy") : 'N/A';
+    const formattedPaymentDate = paymentDate ? format(new Date(paymentDate + 'T00:00:00'), "MMMM d, yyyy") : 'N/A';
     const pageMargin = 15;
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = pageMargin;
 
     if (logoUrl) {
       try {
-        const img = new Image();
-        img.src = logoUrl; // browser will fetch and decode
         const imgTypeMatch = logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
-            const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG'; // Type assertion
-            // Calculate aspect ratio to fit logo nicely
-            const logoMaxHeight = 15; // Max height for logo in PDF units
-            const logoMaxWidth = 40;  // Max width for logo
-            
-            // To use the image in jsPDF, we need its dimensions.
-            // This is async, so a more robust solution might load the image first.
-            // For simplicity, we'll assume standard dimensions or let jsPDF handle it.
-            // A common approach is to set fixed dimensions or scale it.
-            let imgWidth = logoMaxWidth;
-            let imgHeight = logoMaxHeight;
-            // A more accurate way would be to load the image and get its naturalWidth/Height
-            // then scale it. For now, we use fixed max dimensions.
+            const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
+            const image = new Image();
+            image.src = logoUrl;
+            await new Promise(resolve => { image.onload = resolve; image.onerror = resolve;});
 
+            const logoMaxHeight = 15; 
+            const logoMaxWidth = 40;  
+            let imgWidth = image.naturalWidth;
+            let imgHeight = image.naturalHeight;
+
+            if (imgWidth > logoMaxWidth) {
+                const ratio = logoMaxWidth / imgWidth;
+                imgWidth = logoMaxWidth;
+                imgHeight = imgHeight * ratio;
+            }
+            if (imgHeight > logoMaxHeight) {
+                const ratio = logoMaxHeight / imgHeight;
+                imgHeight = logoMaxHeight;
+                imgWidth = imgWidth * ratio;
+            }
             doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight); 
-            currentY += imgHeight + 5; // Add some space after the logo
+            currentY += imgHeight + 5;
         } else {
             console.warn("Unsupported image type for PDF logo or invalid data URI.");
         }
@@ -225,10 +228,9 @@ export function InvoiceGeneratorClient() {
     }
 
     const receiptInfoX = pageWidth - pageMargin;
-    // Use the currentY from after logo and business details for the receipt title block
-    let receiptBlockY = pageMargin; // Start receipt block high if no logo or use adjusted Y
-    if (logoUrl) receiptBlockY = pageMargin; // Keep receipt info aligned to top right regardless of logo for now
-    else receiptBlockY = currentY - 12; // If no logo, align with business name
+    let receiptBlockY = pageMargin; 
+    if (logoUrl) receiptBlockY = pageMargin; 
+    else receiptBlockY = Math.max(pageMargin, currentY - (businessTaxId ? 17 : 12) );
 
 
     doc.setFontSize(14).setFont(undefined, 'bold');
@@ -237,7 +239,7 @@ export function InvoiceGeneratorClient() {
     doc.text(`#${receiptNumber || 'RCPT-XXXX'}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
     doc.text(`Date: ${formattedPaymentDate}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
-    currentY = Math.max(currentY, receiptBlockY + 25); // Ensure currentY is below header and receipt info
+    currentY = Math.max(currentY, receiptBlockY + 25); 
 
     currentY += 10;
     doc.setFontSize(8).setTextColor(100);
@@ -267,13 +269,13 @@ export function InvoiceGeneratorClient() {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
       },
-      didDrawPage: (data) => { // Use this to update Y for content after table
+      didDrawPage: (data) => { 
         currentY = data.cursor?.y || currentY;
       }
     });
-    currentY = (doc as any).lastAutoTable.finalY + 10; // Position totals after the table
+    currentY = (doc as any).lastAutoTable.finalY + 10; 
 
-    const totalsX = pageWidth - pageMargin - 60; 
+    const totalsX = pageWidth - pageMargin - 70; 
     doc.setFontSize(10);
     doc.text("Subtotal:", totalsX, currentY, { align: 'left' });
     doc.text(`$${subtotal.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
@@ -298,13 +300,16 @@ export function InvoiceGeneratorClient() {
       toast({ title: "Not Logged In", description: "Please log in to save invoices.", variant: "destructive" });
       return;
     }
-    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0) || !paymentDate || !receiptNumber) {
+    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description.trim() && s.amount >= 0) || !paymentDate || !receiptNumber) {
         toast({ title: "Incomplete Form", description: "Please fill all required fields and add at least one valid service item.", variant: "destructive"});
         return;
     }
     setIsSavingInvoice(true);
     const { subtotal, taxAmount, totalAmount, taxInfoForDoc } = calculateTotals();
     const invoiceId = crypto.randomUUID();
+    
+    // Ensure paymentDate is treated as local date then converted to Timestamp
+    const localPaymentDate = new Date(paymentDate + 'T00:00:00'); // Appends time to make it local midnight
     
     const invoiceToSave: InvoiceDocument = {
       id: invoiceId,
@@ -316,8 +321,8 @@ export function InvoiceGeneratorClient() {
       clientName,
       clientAddress,
       receiptNumber,
-      paymentDate: Timestamp.fromDate(new Date(paymentDate + 'T00:00:00Z')), // Ensure UTC context for date
-      services: serviceItems.map(s => ({ description: s.description, amount: s.amount })),
+      paymentDate: Timestamp.fromDate(localPaymentDate), 
+      services: serviceItems.map(s => ({ description: s.description, amount: Number(s.amount) })),
       subtotal,
       taxInfo: taxInfoForDoc,
       totalAmount,
@@ -348,9 +353,7 @@ export function InvoiceGeneratorClient() {
         businessTaxId,
         logoUrl,
       });
-      // Toast is handled within updateUserBusinessDetails
     } catch (error) {
-      // Error toast is handled within updateUserBusinessDetails
       console.error("Failed to save business info from client:", error);
     } finally {
       setIsSavingBusinessInfo(false);
@@ -446,7 +449,7 @@ export function InvoiceGeneratorClient() {
                 <div><Label htmlFor="receipt-number">Receipt Number</Label><Input id="receipt-number" value={receiptNumber} onChange={e => setReceiptNumber(e.target.value)} placeholder="e.g., RCPT-001" required /></div>
               </div>
             </div>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Generate & Preview</Button>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base">Generate & Preview</Button>
           </form>
         </CardContent>
       </Card>
@@ -456,16 +459,16 @@ export function InvoiceGeneratorClient() {
             <CardHeader>
                 <CardTitle className="text-xl">Receipt Preview</CardTitle>
             </CardHeader>
-          <CardContent id="receipt-preview-container" className="min-h-[500px] p-1 bg-gray-100 rounded-md overflow-auto">
+          <CardContent id="receipt-preview-container" className="min-h-[500px] p-1 bg-muted/30 rounded-md overflow-auto">
             <div dangerouslySetInnerHTML={{ __html: previewHtml }}/>
           </CardContent>
         </Card>
-        <div className="flex justify-center items-center gap-4 mt-4">
-          <Button onClick={handleSaveInvoice} disabled={!canDownload || isSavingInvoice || !user} className="bg-green-600 hover:bg-green-700 text-white">
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mt-4">
+          <Button onClick={handleSaveInvoice} disabled={!canDownload || isSavingInvoice || !user} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white py-3 text-base">
             {isSavingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             {isSavingInvoice ? "Saving..." : "Save Invoice"}
           </Button>
-          <Button onClick={handleDownloadPdf} disabled={!canDownload} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+          <Button onClick={handleDownloadPdf} disabled={!canDownload} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground py-3 text-base">
             <Download className="mr-2 h-4 w-4" /> Download PDF
           </Button>
         </div>
@@ -473,7 +476,3 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
-
-    
-
-    
