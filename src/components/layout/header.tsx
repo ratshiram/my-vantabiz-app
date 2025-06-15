@@ -5,12 +5,13 @@ import Image from 'next/image';
 export function AppHeader() {
   return (
     <header className="text-center py-6 sm:py-8 bg-card border-b border-border">
-      <div className="relative mx-auto w-auto h-16 sm:h-20" style={{ maxWidth: '250px' }}>
+      <div className="relative mx-auto w-auto h-20 sm:h-24">
         <Image
           src="/vantabizlogo.png"
           alt="VantaBiz Logo"
-          fill
-          style={{ objectFit: 'contain' }}
+          width={250}
+          height={250}
+          style={{ objectFit: 'contain', width: 'auto', height: '100%' }}
           priority
         />
       </div>
