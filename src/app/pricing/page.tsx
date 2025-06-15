@@ -64,7 +64,7 @@ export default function PricingPage() {
         title: "Stripe Configuration Error",
         description: "Stripe publishable key is missing. Payments are disabled. Please check environment variables.",
         variant: "destructive",
-        duration: Infinity, 
+        duration: Infinity,
       });
       setIsStripeKeyMissing(true);
     } else {
@@ -116,10 +116,8 @@ export default function PricingPage() {
         throw new Error('Stripe.js failed to load. Please check your internet connection or ad-blockers.');
       }
 
-      
       const { error: stripeJsError } = await stripe.redirectToCheckout({ sessionId });
 
-      
       if (stripeJsError) {
         console.error("Stripe.js reported an error before redirect:", stripeJsError);
         toast({
@@ -128,7 +126,7 @@ export default function PricingPage() {
           variant: "destructive",
         });
       }
-    } catch (error) { 
+    } catch (error) {
       console.error("Go Pro error during API call or redirect:", error);
       let description = "An unexpected error occurred. Please try again.";
       if (error instanceof Error) {
@@ -140,7 +138,7 @@ export default function PricingPage() {
       } else {
         description = String(error);
       }
-      
+
       toast({
         title: "Upgrade Failed",
         description: description,
@@ -188,9 +186,9 @@ export default function PricingPage() {
             </CardContent>
             <CardFooter>
               {tier.id === "pro" ? (
-                <Button 
-                  className="w-full text-lg py-6" 
-                  variant={tier.variant} 
+                <Button
+                  className="w-full text-lg py-6"
+                  variant={tier.variant}
                   onClick={handleGoProClick}
                   disabled={isLoadingPro || isStripeKeyMissing}
                 >
