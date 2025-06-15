@@ -15,7 +15,6 @@ export function AppHeader() {
           priority
         />
       </div>
-      <p className="text-md sm:text-lg text-foreground mt-2 sm:mt-3 font-medium text-center">Your All-in-One Business Toolkit</p>
     </header>
   );
 }
