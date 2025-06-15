@@ -46,6 +46,8 @@ export function InvoiceGeneratorClient() {
 
   useEffect(() => {
     setIsClient(true);
+    // Ensure date operations are client-side only or handled to avoid hydration mismatch
+    // These are safe as they don't directly render different values server/client immediately
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setReceiptNumber(`RCPT-${Date.now()}`);
     if (serviceItems.length === 0) {
@@ -53,7 +55,6 @@ export function InvoiceGeneratorClient() {
     }
   }, []);
 
-  // Pre-fill business info from user profile
   useEffect(() => {
     if (user && isClient) {
       setBusinessName(user.businessName || '');
@@ -107,8 +108,14 @@ export function InvoiceGeneratorClient() {
   };
 
   const generatePreview = () => {
-    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0) || !paymentDate || !receiptNumber) {
-        toast({ title: "Missing Information", description: "Please fill out all required fields (Business Name, Client Name, Payment Date, Receipt Number, and at least one valid service item) before generating a preview.", variant: "destructive"});
+    if (!businessName || !clientName || serviceItems.length === 0 || 
+        !serviceItems.every(s => s.description && s.amount >= 0) || 
+        !paymentDate || !receiptNumber) {
+        toast({ 
+            title: "Missing Information", 
+            description: "Please fill all required fields: Business Name, Client Name, Payment Date, Receipt Number, and ensure every service item has a description and a valid amount.", 
+            variant: "destructive"
+        });
         setCanDownload(false);
         return;
     }
@@ -179,12 +186,25 @@ export function InvoiceGeneratorClient() {
     if (logoUrl) {
       try {
         const img = new Image();
-        img.src = logoUrl;
+        img.src = logoUrl; // browser will fetch and decode
         const imgTypeMatch = logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
-            const imgType = imgTypeMatch[1].toUpperCase();
-            doc.addImage(logoUrl, imgType, pageMargin, currentY, 30, 15); 
-            currentY += 20; 
+            const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG'; // Type assertion
+            // Calculate aspect ratio to fit logo nicely
+            const logoMaxHeight = 15; // Max height for logo in PDF units
+            const logoMaxWidth = 40;  // Max width for logo
+            
+            // To use the image in jsPDF, we need its dimensions.
+            // This is async, so a more robust solution might load the image first.
+            // For simplicity, we'll assume standard dimensions or let jsPDF handle it.
+            // A common approach is to set fixed dimensions or scale it.
+            let imgWidth = logoMaxWidth;
+            let imgHeight = logoMaxHeight;
+            // A more accurate way would be to load the image and get its naturalWidth/Height
+            // then scale it. For now, we use fixed max dimensions.
+
+            doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight); 
+            currentY += imgHeight + 5; // Add some space after the logo
         } else {
             console.warn("Unsupported image type for PDF logo or invalid data URI.");
         }
@@ -205,13 +225,19 @@ export function InvoiceGeneratorClient() {
     }
 
     const receiptInfoX = pageWidth - pageMargin;
+    // Use the currentY from after logo and business details for the receipt title block
+    let receiptBlockY = pageMargin; // Start receipt block high if no logo or use adjusted Y
+    if (logoUrl) receiptBlockY = pageMargin; // Keep receipt info aligned to top right regardless of logo for now
+    else receiptBlockY = currentY - 12; // If no logo, align with business name
+
+
     doc.setFontSize(14).setFont(undefined, 'bold');
-    doc.text("RECEIPT", receiptInfoX, pageMargin + 5, { align: 'right' });
+    doc.text("RECEIPT", receiptInfoX, receiptBlockY + 5, { align: 'right' });
     doc.setFontSize(10).setFont(undefined, 'normal');
-    doc.text(`#${receiptNumber || 'RCPT-XXXX'}`, receiptInfoX, pageMargin + 12, { align: 'right' });
-    doc.text(`Date: ${formattedPaymentDate}`, receiptInfoX, pageMargin + 17, { align: 'right' });
+    doc.text(`#${receiptNumber || 'RCPT-XXXX'}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
+    doc.text(`Date: ${formattedPaymentDate}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
-    currentY = Math.max(currentY, pageMargin + 25); 
+    currentY = Math.max(currentY, receiptBlockY + 25); // Ensure currentY is below header and receipt info
 
     currentY += 10;
     doc.setFontSize(8).setTextColor(100);
@@ -241,11 +267,11 @@ export function InvoiceGeneratorClient() {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
       },
-      didDrawPage: (data) => {
+      didDrawPage: (data) => { // Use this to update Y for content after table
         currentY = data.cursor?.y || currentY;
       }
     });
-    currentY = (doc as any).lastAutoTable.finalY + 10;
+    currentY = (doc as any).lastAutoTable.finalY + 10; // Position totals after the table
 
     const totalsX = pageWidth - pageMargin - 60; 
     doc.setFontSize(10);
@@ -290,7 +316,7 @@ export function InvoiceGeneratorClient() {
       clientName,
       clientAddress,
       receiptNumber,
-      paymentDate: Timestamp.fromDate(new Date(paymentDate + 'T00:00:00Z')),
+      paymentDate: Timestamp.fromDate(new Date(paymentDate + 'T00:00:00Z')), // Ensure UTC context for date
       services: serviceItems.map(s => ({ description: s.description, amount: s.amount })),
       subtotal,
       taxInfo: taxInfoForDoc,
@@ -447,5 +473,7 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
+
+    
 
     
