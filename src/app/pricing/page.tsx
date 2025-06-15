@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Loader2 } from "lucide-react";
@@ -45,22 +45,50 @@ const tiers = [
 ];
 
 // Initialize Stripe.js with your publishable key
-// Make sure NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is set in your .env.local or environment variables
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+
 
 export default function PricingPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoadingPro, setIsLoadingPro] = useState(false);
+  const [isStripeKeyMissing, setIsStripeKeyMissing] = useState(false);
+
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    if (!key || String(key).trim() === "") {
+      console.warn(
+        "CRITICAL_STRIPE_CONFIG: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set or is empty. " +
+        "Stripe payments will not work. Please check your .env.local file and restart the server."
+      );
+      toast({
+        title: "Stripe Configuration Error",
+        description: "Stripe publishable key is missing. Payments are disabled.",
+        variant: "destructive",
+        duration: Infinity, // Make it sticky
+      });
+      setIsStripeKeyMissing(true);
+    } else {
+      setIsStripeKeyMissing(false);
+    }
+  }, [toast]);
 
   const handleGoProClick = async () => {
+    if (isStripeKeyMissing) {
+      toast({
+        title: "Stripe Not Configured",
+        description: "Cannot proceed: Stripe publishable key is missing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!user) {
       toast({
         title: "Authentication Required",
         description: "Please log in or sign up to upgrade to Pro.",
         variant: "destructive",
       });
-      // Optionally redirect to login: router.push('/login');
       return;
     }
 
@@ -71,7 +99,7 @@ export default function PricingPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId: user.id }), // Send user ID to associate with Stripe customer/session
+        body: JSON.stringify({ userId: user.id }),
       });
 
       if (!response.ok) {
@@ -86,24 +114,36 @@ export default function PricingPage() {
 
       const stripe = await stripePromise;
       if (!stripe) {
-        throw new Error('Stripe.js failed to load.');
+        throw new Error('Stripe.js failed to load. Please check your internet connection or ad-blockers.');
       }
 
-      const { error } = await stripe.redirectToCheckout({ sessionId });
+      // This is where the error "Failed to set a named property 'href' on 'Location'" occurs
+      // if the redirect is blocked by the browser (e.g. in a sandboxed iframe).
+      // Such an error will be caught by the outer try-catch block.
+      const { error: stripeJsError } = await stripe.redirectToCheckout({ sessionId });
 
-      if (error) {
-        console.error("Stripe redirect error:", error);
+      // This 'stripeJsError' is an error object returned by Stripe.js if it identifies an issue
+      // *before* attempting the actual redirection (e.g., invalid session ID).
+      if (stripeJsError) {
+        console.error("Stripe.js reported an error before redirect:", stripeJsError);
         toast({
           title: "Payment Error",
-          description: error.message || "Could not redirect to Stripe. Please try again.",
+          description: stripeJsError.message || "Could not initiate Stripe redirect. Please try again.",
           variant: "destructive",
         });
       }
-    } catch (error) {
-      console.error("Go Pro error:", error);
+    } catch (error) { // Catches errors from fetch, or if redirectToCheckout *throws* an exception (like the 'href' error)
+      console.error("Go Pro error during API call or redirect:", error);
+      let description = (error instanceof Error ? error.message : String(error)) || "An unexpected error occurred. Please try again.";
+      
+      // Check for the specific "href" error message
+      if (error instanceof Error && error.message && error.message.includes("Failed to set a named property 'href' on 'Location'")) {
+          description = "Could not redirect to Stripe. This can happen due to restrictions in the current browsing environment (e.g., running in an iframe without top-navigation permission). If possible, try completing this action in a new, standalone browser tab or window.";
+      }
+      
       toast({
         title: "Upgrade Failed",
-        description: (error instanceof Error ? error.message : String(error)) || "An unexpected error occurred. Please try again.",
+        description: description,
         variant: "destructive",
       });
     } finally {
@@ -152,14 +192,13 @@ export default function PricingPage() {
                   className="w-full text-lg py-6" 
                   variant={tier.variant} 
                   onClick={handleGoProClick}
-                  disabled={isLoadingPro}
+                  disabled={isLoadingPro || isStripeKeyMissing}
                 >
                   {isLoadingPro && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                   {isLoadingPro ? "Processing..." : tier.cta}
                 </Button>
               ) : (
                  <Button asChild className="w-full text-lg py-6" variant={tier.variant}>
-                    {/* Free trial button likely links to signup or dashboard if already logged in */}
                     <Link href={user ? "/" : "/signup"}>{tier.cta}</Link>
                 </Button>
               )}
@@ -173,3 +212,4 @@ export default function PricingPage() {
     </main>
   );
 }
+
