@@ -32,7 +32,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     let currentY = pageMargin;
 
     if (invoice.logoUrl && typeof invoice.logoUrl === 'string' && invoice.logoUrl.trim().startsWith('data:image/')) {
-      const currentLogoUrlConst = invoice.logoUrl; 
+      const currentLogoUrlConst: string = invoice.logoUrl; // Ensure it's a string for image.src
       const imgTypeMatch = currentLogoUrlConst.match(/^data:image\/(png|jpeg|jpg);base64,/);
       if (imgTypeMatch && imgTypeMatch[1]) {
         const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
@@ -44,10 +44,10 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
               console.error("Image load error for PDF (list-table):", errEvt);
               reject(new Error("Image load error for PDF generation: Failed to load logo."));
             };
-            if (currentLogoUrlConst) { // Extra check to satisfy TypeScript strict null checks
+            if (typeof currentLogoUrlConst === 'string') { 
                 image.src = currentLogoUrlConst;
             } else {
-                reject(new Error("Logo URL is null or undefined before assigning to image.src"));
+                reject(new Error("Logo URL is not a string before assigning to image.src"));
             }
           });
 
@@ -81,13 +81,13 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
 
 
     doc.setFontSize(18);
-    doc.text(invoice.businessName || "", pageMargin, currentY);
+    doc.text(String(invoice.businessName || ""), pageMargin, currentY);
     currentY += 7;
     doc.setFontSize(10);
-    doc.text(invoice.businessAddress || "", pageMargin, currentY);
+    doc.text(String(invoice.businessAddress || ""), pageMargin, currentY);
     currentY += 5;
     if (invoice.taxId) {
-      doc.text(`Tax ID: ${invoice.taxId}`, pageMargin, currentY);
+      doc.text(`Tax ID: ${String(invoice.taxId)}`, pageMargin, currentY);
       currentY += 5;
     }
 
@@ -104,7 +104,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     doc.setFontSize(14).setFont(undefined, 'bold');
     doc.text("RECEIPT", receiptInfoX, receiptBlockY + 5, { align: 'right' });
     doc.setFontSize(10).setFont(undefined, 'normal');
-    doc.text(`#${invoice.receiptNumber || ""}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
+    doc.text(`#${String(invoice.receiptNumber || "")}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
     doc.text(`Date: ${format(invoice.paymentDate, "MMMM d, yyyy")}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
     currentY = Math.max(currentY, receiptBlockY + 25);
@@ -115,10 +115,10 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     currentY += 4;
     doc.setFontSize(10).setTextColor(0);
     doc.setFont(undefined, 'bold');
-    doc.text(invoice.clientName || "", pageMargin, currentY);
+    doc.text(String(invoice.clientName || ""), pageMargin, currentY);
     currentY += 5;
     doc.setFont(undefined, 'normal');
-    doc.text(invoice.clientAddress || "", pageMargin, currentY);
+    doc.text(String(invoice.clientAddress || ""), pageMargin, currentY);
     currentY += 10;
 
     const tableColumn = ["Description", "Amount"];
@@ -159,7 +159,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
         const rateDisplay = (invoice.taxInfo.rate * 100).toFixed(invoice.taxInfo.rate === 0.14975 ? 3 : (invoice.taxInfo.rate * 100 % 1 === 0 ? 0 : 1) );
         taxLabel = `Tax (${invoice.taxInfo.location} @ ${rateDisplay}%)`;
       }
-      doc.text(`${taxLabel || 'Tax'}:`, totalsX, currentY, { align: 'left'});
+      doc.text(`${String(taxLabel || 'Tax')}:`, totalsX, currentY, { align: 'left'});
       doc.text(`$${invoice.taxInfo.amount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
       currentY += 7;
     }
@@ -220,5 +220,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     </Card>
   );
 }
+
+    
 
     

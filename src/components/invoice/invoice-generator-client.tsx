@@ -248,13 +248,13 @@ export function InvoiceGeneratorClient() {
     }
     
     doc.setFontSize(18);
-    doc.text(businessName || "", pageMargin, currentY);
+    doc.text(String(businessName || ""), pageMargin, currentY);
     currentY += 7;
     doc.setFontSize(10);
-    doc.text(businessAddress || "", pageMargin, currentY);
+    doc.text(String(businessAddress || ""), pageMargin, currentY);
     currentY += 5;
     if (businessTaxId) {
-      doc.text(`Tax ID: ${businessTaxId}`, pageMargin, currentY);
+      doc.text(`Tax ID: ${String(businessTaxId)}`, pageMargin, currentY);
       currentY += 5;
     }
 
@@ -271,8 +271,8 @@ export function InvoiceGeneratorClient() {
     doc.setFontSize(14).setFont(undefined, 'bold');
     doc.text("RECEIPT", receiptInfoX, receiptBlockY + 5, { align: 'right' });
     doc.setFontSize(10).setFont(undefined, 'normal');
-    doc.text(`#${receiptNumber || 'RCPT-XXXX'}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
-    doc.text(`Date: ${formattedPaymentDate}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
+    doc.text(`#${String(receiptNumber || 'RCPT-XXXX')}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
+    doc.text(`Date: ${String(formattedPaymentDate)}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
     currentY = Math.max(currentY, receiptBlockY + 25);
 
@@ -282,10 +282,10 @@ export function InvoiceGeneratorClient() {
     currentY += 4;
     doc.setFontSize(10).setTextColor(0);
     doc.setFont(undefined, 'bold');
-    doc.text(clientName || "", pageMargin, currentY);
+    doc.text(String(clientName || ""), pageMargin, currentY);
     currentY += 5;
     doc.setFont(undefined, 'normal');
-    doc.text(clientAddress || "", pageMargin, currentY);
+    doc.text(String(clientAddress || ""), pageMargin, currentY);
     currentY += 10;
 
     const tableColumn = ["Description", "Amount"];
@@ -320,7 +320,7 @@ export function InvoiceGeneratorClient() {
     currentY += 7;
 
     if (taxOption !== 'none' && taxAmount > 0) {
-      doc.text(`${taxLabel || 'Tax'}:`, totalsX, currentY, { align: 'left' });
+      doc.text(`${String(taxLabel || 'Tax')}:`, totalsX, currentY, { align: 'left' });
       doc.text(`$${taxAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
       currentY += 7;
     }
@@ -522,5 +522,7 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
+
+    
 
     
