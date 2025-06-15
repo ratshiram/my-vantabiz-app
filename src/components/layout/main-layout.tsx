@@ -1,4 +1,4 @@
-import React from 'type-chef/react';
+import React from 'react';
 import { AppHeader } from './header'; 
 import { NavigationMenu } from './navigation-menu';
 
