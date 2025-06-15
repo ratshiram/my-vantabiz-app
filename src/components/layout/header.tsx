@@ -1,21 +1,24 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
-const LogoIcon = () => (
-  <svg className="h-10 w-10 sm:h-12 sm:w-12 text-primary" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Updated to use CSS var for gradient if possible, or keep as is if specific brand colors are needed */}
-    <rect width="40" height="40" rx="8" fill="currentColor"/> 
-    <path d="M11 12L16.6667 28L20.4444 18.2222L29 12L20.4444 15.7778L16.6667 28L14.7778 21.8889L11 19.5556L18.5556 16.6667L11 12Z" fill="white"/>
-  </svg>
-);
+// URL for the new logo
+const logoUrl = "https://image-proxy.idx.run/https%3A%2F%2Ffirebasestorage.googleapis.com%2Fv0%2Fb%2Fproject-idx-75379.appspot.com%2Fo%2Fgithub.com%252FAssistant%252Finitial_content_images%252Fimage_2.png%3Falt%3Dmedia%26token%3D8a5182aa-e9df-4a8a-9d4c-d576d36e34e4";
 
 export function AppHeader() {
   return (
     <header className="text-center py-6 sm:py-8 bg-card border-b border-border">
-      <Link href="/" className="inline-flex justify-center items-center space-x-3 group" aria-label="VantaBiz Home">
-        <LogoIcon />
-        <span className="text-3xl sm:text-4xl font-extrabold text-primary group-hover:text-primary/90 transition-colors">VantaBiz Suite</span>
+      <Link href="/" className="inline-block group" aria-label="VantaBiz Home">
+        <Image
+          src={logoUrl}
+          alt="VantaBiz Logo"
+          width={176} // Intrinsic width for an aspect ratio of approx 3.66:1
+          height={48} // Intrinsic height for an aspect ratio of approx 3.66:1
+          className="h-10 sm:h-12 w-auto" // Tailwind classes to control responsive display size
+          priority // Marks the image as high-priority for loading (good for LCP)
+        />
+        {/* The "VantaBiz Suite" text span that was here is removed as the logo image includes the text */}
       </Link>
-      <p className="text-md sm:text-lg text-foreground mt-1 sm:mt-2 font-medium">Your All-in-One Business Toolkit</p>
+      <p className="text-md sm:text-lg text-foreground mt-2 sm:mt-3 font-medium">Your All-in-One Business Toolkit</p>
     </header>
   );
 }

@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'image-proxy.idx.run', // Added for the new logo
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };
