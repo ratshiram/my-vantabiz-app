@@ -2,14 +2,15 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: 'export', // Configure Next.js for static export
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, // Fail build on TypeScript errors
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false, // Fail build on ESLint errors
   },
   images: {
+    unoptimized: true, // Disable Next.js image optimization for static export
     remotePatterns: [
       {
         protocol: 'https',
