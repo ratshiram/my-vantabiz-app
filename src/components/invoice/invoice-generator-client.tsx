@@ -456,22 +456,30 @@ export function InvoiceGeneratorClient() {
 
       <div className="lg:col-span-3">
         <Card className="sticky top-8 shadow-xl">
-            <CardHeader>
-                <CardTitle className="text-xl">Receipt Preview</CardTitle>
-            </CardHeader>
-          <CardContent id="receipt-preview-container" className="min-h-[500px] p-1 bg-muted/30 rounded-md overflow-auto">
+          <CardHeader>
+            <CardTitle className="text-xl">Receipt Preview</CardTitle>
+          </CardHeader>
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-3 p-4 border-b">
+            <Button 
+              onClick={handleSaveInvoice} 
+              disabled={!canDownload || isSavingInvoice || !user} 
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white py-3 text-base"
+            >
+              {isSavingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSavingInvoice ? "Saving..." : "Save Invoice"}
+            </Button>
+            <Button 
+              onClick={handleDownloadPdf} 
+              disabled={!canDownload} 
+              className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground py-3 text-base"
+            >
+              <Download className="mr-2 h-4 w-4" /> Download PDF
+            </Button>
+          </div>
+          <CardContent id="receipt-preview-container" className="min-h-[500px] p-1 bg-muted/30 rounded-b-md overflow-auto">
             <div dangerouslySetInnerHTML={{ __html: previewHtml }}/>
           </CardContent>
         </Card>
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mt-4">
-          <Button onClick={handleSaveInvoice} disabled={!canDownload || isSavingInvoice || !user} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white py-3 text-base">
-            {isSavingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {isSavingInvoice ? "Saving..." : "Save Invoice"}
-          </Button>
-          <Button onClick={handleDownloadPdf} disabled={!canDownload} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground py-3 text-base">
-            <Download className="mr-2 h-4 w-4" /> Download PDF
-          </Button>
-        </div>
       </div>
     </div>
   );
