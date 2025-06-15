@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 
 
-const categoryIcons = new Map([...incomeCategories, ...expenseCategories].map(cat => [cat.value, cat.icon]));
+const categoryIconsMap = new Map([...incomeCategories, ...expenseCategories].map(cat => [cat.value, cat.icon]));
 
 interface TransactionsTableProps {
   transactions: Transaction[];
@@ -112,7 +112,8 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
 
     let tableEndY = (doc as any).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
-      tableEndY = mainTableStartY; // Fallback if autoTable didn't return a valid Y or if no table was drawn
+      // Fallback if autoTable didn't return a valid Y or if no table was drawn
+      tableEndY = mainTableStartY + (tableRows.length > 0 ? tableRows.length * 10 : 10); 
     }
     currentY = tableEndY; 
 
@@ -235,23 +236,26 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
             </TableHeader>
             <TableBody>
               {sortedTransactions.length > 0 ? (
-                sortedTransactions.map((t) => (
-                  <TableRow key={t.id} className="hover:bg-muted/50 transition-colors">
-                    <TableCell className="px-4">{format(new Date(t.date), "MMM d, yyyy")}</TableCell>
-                    <TableCell className="px-4">{t.description}</TableCell>
-                    <TableCell className="flex items-center px-4">
-                      {React.isValidElement(categoryIcons.get(t.category)) ? React.cloneElement(categoryIcons.get(t.category) as React.ReactElement, { className: "mr-2 h-4 w-4" }) : null}
-                      <span className="ml-2">{t.category}</span>
-                    </TableCell>
-                    <TableCell
-                      className={`text-right font-semibold px-4 ${
-                        t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
-                      }`}
-                    >
-                      {t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)}
-                    </TableCell>
-                  </TableRow>
-                ))
+                sortedTransactions.map((t) => {
+                  const iconElement = categoryIconsMap.get(t.category);
+                  return (
+                    <TableRow key={t.id} className="hover:bg-muted/50 transition-colors">
+                      <TableCell className="px-4">{format(new Date(t.date), "MMM d, yyyy")}</TableCell>
+                      <TableCell className="px-4">{t.description}</TableCell>
+                      <TableCell className="flex items-center px-4">
+                        {React.isValidElement(iconElement) ? React.cloneElement(iconElement, { className: "mr-2 h-4 w-4 text-muted-foreground" }) : null}
+                        <span>{t.category}</span>
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-semibold px-4 ${
+                          t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
+                        }`}
+                      >
+                        {t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-muted-foreground py-8 px-4">
@@ -266,3 +270,4 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     </Card>
   );
 }
+

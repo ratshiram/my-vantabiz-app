@@ -129,7 +129,9 @@ export function InvoiceGeneratorClient() {
     }
     tfootHtml += `<tr style="font-weight: bold; color: #111827;"><td style="padding-top: 8px; padding-right: 16px; text-align: right;">Total Paid</td><td style="text-align: right; padding-top: 8px; padding-left: 16px;">$${totalAmount.toFixed(2)}</td></tr>`;
     
-    const logoDisplayHtml = (logoUrl && logoUrl.trim()) ? `<img src="${logoUrl}" alt="Business Logo" style="margin-bottom: 1rem; max-height: 4rem; max-width: 10rem; object-fit: contain;">` : '';
+    const logoDisplayHtml = (logoUrl && typeof logoUrl === 'string' && logoUrl.trim().startsWith('data:image/')) 
+      ? `<img src="${logoUrl}" alt="Business Logo" style="margin-bottom: 1rem; max-height: 4rem; max-width: 10rem; object-fit: contain;">` 
+      : '';
     
     const html = `<div style="font-family: 'Inter', Arial, sans-serif; font-size: 12px; padding: 20px; color: #374151; max-width: 800px; margin: auto; border: 1px solid #e5e7eb; background: white;">
                     ${logoDisplayHtml}
@@ -190,10 +192,10 @@ export function InvoiceGeneratorClient() {
         try {
           await new Promise<void>((resolve, reject) => {
             image.onload = () => resolve();
-            image.onerror = (err) => {
-              console.error("Image load error for PDF (generator):", err);
+            image.onerror = (errEvt) => {
+              console.error("Image load error for PDF (generator):", errEvt);
               toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
-              reject(new Error("Image load error for PDF generation"));
+              reject(new Error("Image load error for PDF generation")); // This rejection will be caught by the outer try-catch
             };
             image.src = logoUrl;
           });
@@ -216,8 +218,11 @@ export function InvoiceGeneratorClient() {
           doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
           currentY += imgHeight + 5;
         } catch (imgLoadOrAddError) {
-          console.error("Error processing logo for PDF (generator):", imgLoadOrAddError);
-          // Toast is handled in image.onerror
+          // Error already toasted in image.onerror if it's an image load error.
+          // If it's another error (e.g., from doc.addImage), log it.
+          if (!(imgLoadOrAddError instanceof Error && imgLoadOrAddError.message === "Image load error for PDF generation")) {
+            console.error("Error processing logo for PDF (generator):", imgLoadOrAddError);
+          }
         }
       } else {
         console.warn("Unsupported image type for PDF logo or invalid data URI format (generator).");
@@ -239,9 +244,10 @@ export function InvoiceGeneratorClient() {
     const receiptInfoX = pageWidth - pageMargin;
     let receiptBlockY = pageMargin; 
     if (logoUrl && typeof logoUrl === 'string' && logoUrl.trim().startsWith('data:image/')) {
-        // No change to receiptBlockY if logo was attempted, currentY already advanced
+        // currentY might have advanced if logo was successfully added
     } else {
-        receiptBlockY = Math.max(pageMargin, currentY - (businessTaxId ? 17 : 12) );
+        // If no logo or logo failed, ensure receiptBlockY aligns with business info
+        receiptBlockY = Math.max(pageMargin, currentY - (businessTaxId ? 17 : 12) ); 
     }
 
 
@@ -285,7 +291,7 @@ export function InvoiceGeneratorClient() {
     
     let tableEndY = (doc as any).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
-      tableEndY = currentY; // Fallback if autoTable didn't return a valid Y
+      tableEndY = currentY + (tableRowsData.length * 10); // Basic fallback
     }
     currentY = tableEndY + 10;
 
@@ -374,6 +380,7 @@ export function InvoiceGeneratorClient() {
       });
     } catch (error) {
       console.error("Failed to save business info from client:", error);
+      // Toast for failure is handled within updateUserBusinessDetails or here if needed
     } finally {
       setIsSavingBusinessInfo(false);
     }
@@ -503,3 +510,4 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
+

@@ -39,10 +39,10 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
         try {
           await new Promise<void>((resolve, reject) => {
             image.onload = () => resolve();
-            image.onerror = (err) => {
-              console.error("Image load error for PDF (list-table):", err);
+            image.onerror = (errEvt) => { // Changed variable name to avoid conflict
+              console.error("Image load error for PDF (list-table):", errEvt);
               toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
-              reject(new Error("Image load error for PDF generation"));
+              reject(new Error("Image load error for PDF generation")); // This rejection will be caught by the outer try-catch
             };
             image.src = invoice.logoUrl;
           });
@@ -66,8 +66,11 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
           doc.addImage(invoice.logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
           currentY += imgHeight + 5;
         } catch (imgLoadOrAddError) {
-          console.error("Error processing logo for PDF (list-table):", imgLoadOrAddError);
-          // Toast is handled in image.onerror
+          // Error already toasted in image.onerror if it's an image load error.
+          // If it's another error (e.g., from doc.addImage), log it.
+          if (!(imgLoadOrAddError instanceof Error && imgLoadOrAddError.message === "Image load error for PDF generation")) {
+            console.error("Error processing logo for PDF (list-table):", imgLoadOrAddError);
+          }
         }
       } else {
         console.warn("Invoice logoUrl is not a valid data URI or unsupported image type (list-table).");
@@ -90,9 +93,10 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     const receiptInfoX = pageWidth - pageMargin;
     let receiptBlockY = pageMargin;
     if (invoice.logoUrl && typeof invoice.logoUrl === 'string' && invoice.logoUrl.trim().startsWith('data:image/')) {
-        // No change to receiptBlockY if logo was attempted, currentY already advanced
+        // currentY might have advanced if logo was successfully added
     } else {
-        receiptBlockY = Math.max(pageMargin, currentY - (invoice.taxId ? 17 : 12) );
+        // If no logo or logo failed, ensure receiptBlockY aligns with business info
+        receiptBlockY = Math.max(pageMargin, currentY - (invoice.taxId ? 17 : 12) ); 
     }
 
 
@@ -137,7 +141,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     
     let tableEndY = (doc as any).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
-      tableEndY = mainTableStartY; // Fallback if autoTable didn't return a valid Y
+      tableEndY = mainTableStartY + (tableRowsData.length * 10); // Basic fallback
     }
     currentY = tableEndY + 10;
 
@@ -150,7 +154,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
 
     if (invoice.taxInfo.option !== 'none' && invoice.taxInfo.amount && invoice.taxInfo.amount > 0) {
       let taxLabel = "Tax";
-      if (invoice.taxInfo.option === 'ca' && invoice.taxInfo.location && invoice.taxInfo.rate) {
+      if (invoice.taxInfo.option === 'ca' && invoice.taxInfo.location && typeof invoice.taxInfo.rate === 'number') {
         const rateDisplay = (invoice.taxInfo.rate * 100).toFixed(invoice.taxInfo.rate === 0.14975 ? 3 : (invoice.taxInfo.rate * 100 % 1 === 0 ? 0 : 1) );
         taxLabel = `Tax (${invoice.taxInfo.location} @ ${rateDisplay}%)`;
       }
@@ -215,3 +219,4 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     </Card>
   );
 }
+
