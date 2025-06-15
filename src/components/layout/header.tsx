@@ -5,7 +5,7 @@ import Image from 'next/image';
 export function AppHeader() {
   return (
     <header className="flex flex-col items-center py-6 sm:py-8 bg-card border-b border-border">
-      <div className="relative w-auto h-20 sm:h-24">
+      <div className="relative w-auto h-24 sm:h-28">
         <Image
           src="/vantabizlogo.png"
           alt="VantaBiz Logo"
