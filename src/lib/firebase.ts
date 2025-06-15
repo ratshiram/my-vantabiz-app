@@ -39,6 +39,7 @@ const requiredConfigKeys: (keyof typeof firebaseConfigValues)[] = [
   'projectId',
 ];
 
+// Check for missing or empty *required* environment variables
 const missingOrEmptyVars = requiredConfigKeys.filter(key => {
   const value = firebaseConfigValues[key];
   return value === undefined || value === null || String(value).trim() === "";
@@ -46,17 +47,22 @@ const missingOrEmptyVars = requiredConfigKeys.filter(key => {
 
 if (missingOrEmptyVars.length > 0) {
   const missingVarDetails = missingOrEmptyVars
-    .map(key => expectedEnvVarNames[key])
+    .map(key => expectedEnvVarNames[key]) // Use the actual env var name in the message
     .join(', ');
+
   const currentValuesDetails = requiredConfigKeys
-    .map(key => `${expectedEnvVarNames[key]}: ${firebaseConfigValues[key] && String(firebaseConfigValues[key]).trim() !== "" ? 'SET_BUT_POSSIBLY_INVALID' : 'MISSING_OR_EMPTY'}`)
+    .map(key => {
+      const envVarName = expectedEnvVarNames[key]; // For displaying the name
+      const value = firebaseConfigValues[key];    // For checking the value
+      return `${envVarName}: ${value && String(value).trim() !== "" ? 'SET_BUT_POSSIBLY_INVALID' : 'MISSING_OR_EMPTY'}`;
+    })
     .join(', ');
 
   const errorMessage =
     `CRITICAL_FIREBASE_CONFIG_ERROR: Essential Firebase configuration environment variables are missing or empty. ` +
     `Please ensure the following environment variables are correctly set with non-empty values: ${missingVarDetails}. ` +
     'Check your .env.local file (for local development) or your hosting provider settings (e.g., Netlify Environment Variables) for deployment. ' +
-    `Current Values (internal mapping check): ${currentValuesDetails}.`;
+    `Current Status of Required Variables (based on process.env access): ${currentValuesDetails}.`;
   
   console.error(errorMessage);
   // This console.error will be visible in your server logs (local terminal or Netlify Function logs).
@@ -89,14 +95,19 @@ try {
 
 } catch (error) {
   console.error("CRITICAL_FIREBASE_INIT_OR_SERVICE_ERROR: Failed to initialize Firebase app or get Auth/Firestore service.", error);
-  console.error("Firebase Config Used (values passed to initializeApp):", {
-    apiKey: firebaseConfig.apiKey ? 'PRESENT_BUT_POSSIBLY_INVALID' : 'MISSING_OR_EMPTY_IN_CONFIG_OBJECT',
-    authDomain: firebaseConfig.authDomain ? 'PRESENT' : 'MISSING_OR_EMPTY_IN_CONFIG_OBJECT',
-    projectId: firebaseConfig.projectId ? 'PRESENT' : 'MISSING_OR_EMPTY_IN_CONFIG_OBJECT',
-    // Add other non-sensitive config values if needed for debugging, but avoid logging full keys.
-  });
-  // It's critical to re-throw the error if Firebase cannot initialize,
-  // otherwise the app might continue in a broken state.
+  // Log the config values that would be passed to initializeApp, showing status based on their direct values from firebaseConfigValues
+  const configPassedToInitStatus = Object.fromEntries(
+    Object.entries(firebaseConfig).map(([key, value]) => [
+      key,
+      value && String(value).trim() !== "" ? 'PROVIDED_TO_INIT_BUT_POSSIBLY_INVALID' : 'MISSING_OR_EMPTY_IN_CONFIG_OBJECT_FOR_INIT'
+    ])
+  );
+  console.error("Firebase Config Object Passed to initializeApp (values derived from process.env):", configPassedToInitStatus);
+  // If you are here, and you previously saw the CRITICAL_FIREBASE_CONFIG_ERROR, it means one of the values
+  // passed to initializeApp (even if present) is so malformed it's causing an immediate failure
+  // BEFORE the "auth/invalid-api-key" check can even happen (e.g., an authDomain that's not a valid hostname).
+  // However, if you see "auth/invalid-api-key" in the browser console, it means this try block succeeded,
+  // but the API key itself was rejected by Firebase servers.
   throw error; 
 }
 
