@@ -1,55 +1,63 @@
-
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # Dependencies
 /node_modules
 /.pnp
 .pnp.js
+*.pnp.loader.mjs
 
 # Testing
 /coverage
 
-# Next.js build output
+# Next.js
 /.next/
 /out/
 
-# Minified files / Compilation output
-/dist
-*.js.map
-*.css.map
+# Vercel
+.vercel
 
-# Production
-/build
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
 
 # Misc
 .DS_Store
 *.pem
-
-# Local Environment Variables
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+*.crt
+*.key
 
 # Log files
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+firebase-debug.log*
 
-# Editor directories and files
-.vscode/*
+# Local Environment Variables
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# Turborepo
+.turbo
+
+# IDE files & settings
+.vscode/
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+*.sublime-workspace
 
 # Firebase
-.firebase
-firebase-debug.log
+# .firebase - if you don't want to commit firebase emulators data etc.
+# /hosting/dist - if your vite app output is 'dist' and you don't want it versioned from root
+
+# Docusaurus output (if used)
+.docusaurus
+
+# Angular
+/dist
+/tmp
+temp
