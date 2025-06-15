@@ -107,7 +107,7 @@ export function InvoiceGeneratorClient() {
 
   const generatePreview = () => {
     if (!businessName || !clientName || serviceItems.length === 0 || 
-        !serviceItems.every(s => s.description.trim() && s.amount >= 0) || // Ensure description is not just whitespace
+        !serviceItems.every(s => s.description.trim() && s.amount >= 0) || 
         !paymentDate || !receiptNumber) {
         toast({ 
             title: "Missing Information", 
@@ -308,16 +308,13 @@ export function InvoiceGeneratorClient() {
     const { subtotal, taxAmount, totalAmount, taxInfoForDoc } = calculateTotals();
     const invoiceId = crypto.randomUUID();
     
-    // Ensure paymentDate is treated as local date then converted to Timestamp
-    const localPaymentDate = new Date(paymentDate + 'T00:00:00'); // Appends time to make it local midnight
+    const localPaymentDate = new Date(paymentDate + 'T00:00:00');
     
-    const invoiceToSave: InvoiceDocument = {
+    const invoiceBaseData = {
       id: invoiceId,
       userId: user.id,
       businessName,
       businessAddress,
-      taxId: businessTaxId || undefined,
-      logoUrl: logoUrl || undefined,
       clientName,
       clientAddress,
       receiptNumber,
@@ -327,7 +324,15 @@ export function InvoiceGeneratorClient() {
       taxInfo: taxInfoForDoc,
       totalAmount,
       createdAt: Timestamp.now(),
+      logoUrl: (logoUrl && logoUrl.trim()) ? logoUrl : null, // Ensure logoUrl is null if empty
     };
+
+    // Conditionally add taxId if it's a non-empty string
+    const invoiceToSave: InvoiceDocument = {
+        ...invoiceBaseData,
+        ...(businessTaxId && businessTaxId.trim() && { taxId: businessTaxId.trim() }),
+    };
+
 
     try {
       await setDoc(doc(db, "invoices", invoiceId), invoiceToSave);
@@ -484,3 +489,4 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
+
