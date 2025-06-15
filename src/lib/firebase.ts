@@ -26,29 +26,24 @@ const requiredEnvVars: (keyof typeof firebaseConfigValues)[] = [
   'apiKey',
   'authDomain',
   'projectId',
-  // storageBucket, messagingSenderId, appId are often important but might not be strictly required for auth/firestore initialization.
-  // Add them here if they become critical for your app's core functionality.
 ];
 
-const missingVars = requiredEnvVars.filter(key => {
+const missingOrEmptyVars = requiredEnvVars.filter(key => {
   const value = firebaseConfigValues[key];
-  return !value || value.trim() === "";
+  return value === undefined || value === null || String(value).trim() === "";
 });
 
-if (missingVars.length > 0) {
+if (missingOrEmptyVars.length > 0) {
   const errorMessage =
     `CRITICAL_FIREBASE_CONFIG_ERROR: Essential Firebase configuration environment variables are missing or empty. ` +
-    `Please ensure the following environment variables are correctly set with non-empty values: ${missingVars.map(v => `NEXT_PUBLIC_FIREBASE_${v.toUpperCase()}`).join(', ')}. ` +
-    'Check .env.local for local development, or your hosting provider settings (e.g., Netlify) for deployment. ' +
-    `Current Values (masked for security if present): ${requiredEnvVars.map(k => `${k}: ${firebaseConfigValues[k] ? 'SET' : 'MISSING_OR_EMPTY'}`).join(', ')}`;
+    `Please ensure the following environment variables are correctly set with non-empty values: ${missingOrEmptyVars.map(v => `NEXT_PUBLIC_FIREBASE_${v.toUpperCase()}`).join(', ')}. ` +
+    'Check your .env.local file (for local development) or your hosting provider settings (e.g., Netlify Environment Variables) for deployment. ' +
+    `Current Values (masked for security if present): ${requiredEnvVars.map(k => `${k}: ${firebaseConfigValues[k] && String(firebaseConfigValues[k]).trim() !== "" ? 'SET_BUT_POSSIBLY_INVALID' : 'MISSING_OR_EMPTY'}`).join(', ')}`;
   
   console.error(errorMessage);
-  // Note: Throwing an error here might be too disruptive if some parts of the app can run without full Firebase.
-  // However, for an auth/invalid-api-key, it's likely auth is fundamental.
-  // Depending on the app's needs, you might throw here or handle it more gracefully.
-  // For now, the console error should be prominent.
+  // This will be caught by the try-catch below if initialization fails due to truly missing critical config.
+  // For "auth/invalid-api-key", firebaseConfigValues.apiKey might be present but incorrect.
 }
-
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: firebaseConfigValues.apiKey,
@@ -60,12 +55,27 @@ const firebaseConfig: FirebaseOptions = {
   measurementId: firebaseConfigValues.measurementId,
 };
 
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
 
-// Initialize Firebase
-// This pattern prevents re-initializing the app on hot reloads
-const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-// The next line (getAuth) is where "auth/invalid-api-key" will typically throw if the apiKey in firebaseConfig is bad
-const auth: Auth = getAuth(app); 
-const db: Firestore = getFirestore(app);
+try {
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApp();
+  }
+  
+  auth = getAuth(app); 
+  db = getFirestore(app);
+
+} catch (error) {
+  console.error("CRITICAL_FIREBASE_INIT_OR_SERVICE_ERROR: Failed to initialize Firebase app or get Auth/Firestore service.", error);
+  console.error("Firebase Config Used:", firebaseConfig); // Log the config that was attempted
+  // If there's a CRITICAL_FIREBASE_CONFIG_ERROR from above due to missing vars, initializeApp might still proceed
+  // but then getAuth/getFirestore could fail, or getAuth might throw auth/invalid-api-key if apiKey is present but wrong.
+  // Re-throwing here makes it clear that Firebase setup failed.
+  throw error; 
+}
 
 export { app, auth, db };
