@@ -89,6 +89,7 @@ export default function PricingPage() {
         description: "Please log in or sign up to upgrade to Pro.",
         variant: "destructive",
       });
+      // Optionally, redirect to login: router.push('/login');
       return;
     }
 
@@ -212,4 +213,3 @@ export default function PricingPage() {
     </main>
   );
 }
-
