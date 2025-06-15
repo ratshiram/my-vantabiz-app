@@ -63,7 +63,7 @@ export default function PricingPage() {
       );
       toast({
         title: "Stripe Configuration Error",
-        description: "Stripe publishable key is missing. Payments are disabled.",
+        description: "Stripe publishable key is missing. Payments are disabled. Please check environment variables.",
         variant: "destructive",
         duration: Infinity, // Make it sticky
       });
@@ -77,7 +77,7 @@ export default function PricingPage() {
     if (isStripeKeyMissing) {
       toast({
         title: "Stripe Not Configured",
-        description: "Cannot proceed: Stripe publishable key is missing.",
+        description: "Cannot proceed: Stripe publishable key is missing. Please check environment variables.",
         variant: "destructive",
       });
       return;
@@ -135,11 +135,15 @@ export default function PricingPage() {
       }
     } catch (error) { // Catches errors from fetch, or if redirectToCheckout *throws* an exception (like the 'href' error)
       console.error("Go Pro error during API call or redirect:", error);
-      let description = (error instanceof Error ? error.message : String(error)) || "An unexpected error occurred. Please try again.";
-      
-      // Check for the specific "href" error message
-      if (error instanceof Error && error.message && error.message.includes("Failed to set a named property 'href' on 'Location'")) {
-          description = "Could not redirect to Stripe. This can happen due to restrictions in the current browsing environment (e.g., running in an iframe without top-navigation permission). If possible, try completing this action in a new, standalone browser tab or window.";
+      let description = "An unexpected error occurred. Please try again.";
+      if (error instanceof Error) {
+        description = error.message;
+        // Check for the specific "href" error message
+        if (error.message && error.message.includes("Failed to set a named property 'href' on 'Location'")) {
+            description = "Could not redirect to Stripe. This can happen due to restrictions in the current browsing environment (e.g., running in an iframe without top-navigation permission). If possible, try completing this action in a new, standalone browser tab or window.";
+        }
+      } else {
+        description = String(error);
       }
       
       toast({
