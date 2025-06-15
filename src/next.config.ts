@@ -2,7 +2,6 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'standalone', // Explicitly set output mode
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,
@@ -20,11 +19,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    allowedDevOrigins: [
-        'http://6000-firebase-studio-1749937401269.cluster-joak5ukfbnbyqspg4tewa33d24.cloudworkstations.dev'
-    ],
-  }
 };
 
 export default nextConfig;

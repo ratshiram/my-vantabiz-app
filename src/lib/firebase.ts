@@ -3,58 +3,69 @@ import { initializeApp, getApps, getApp, type FirebaseOptions, type FirebaseApp 
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
-// IMPORTANT:
-// You MUST replace these placeholder values with your actual Firebase project configuration!
-// You can find these in your Firebase project console:
-// Project settings > General > Your apps > SDK setup and configuration > Config
+// !! IMPORTANT !!
+// If you are seeing "Firebase: Error (auth/invalid-api-key)", TRIPLE-CHECK that the value for
+// NEXT_PUBLIC_FIREBASE_API_KEY in your .env.local file (for local development)
+// or in your Netlify (or other hosting provider) Environment Variables settings
+// is EXACTLY CORRECT and matches the API Key from your Firebase project console.
+// (Project settings > General > Your apps > SDK setup and configuration > Config > apiKey)
+// Also, ensure the variable is not an empty string or just whitespace.
+// =================================================================================================
 
-// Option 1: Using hardcoded values (FOR TESTING/DIAGNOSIS ONLY - NOT RECOMMENDED FOR PRODUCTION)
-// This section is now commented out in favor of environment variables.
-/*
-const firebaseConfig_hardcoded: FirebaseOptions = {
-  apiKey: "AIzaSyBwJh2-CUhm7qE2C8NMEytfQm7sbxzKfUc", // Replace with your actual API Key
-  authDomain: "fintrack-lite-10936.firebaseapp.com", // Replace with your actual Auth Domain (e.g., project-id.firebaseapp.com)
-  projectId: "fintrack-lite-10936", // Replace with your actual Project ID
-  storageBucket: "fintrack-lite-10936.firebasestorage.app", // Replace with your actual Storage Bucket (e.g., project-id.appspot.com)
-  messagingSenderId: "44749033941", // Replace with your actual Messaging Sender ID
-  appId: "1:44749033941:web:fa9dbebe835f2977932d5c", // Replace with your actual App ID
-  // measurementId is optional and can be added if Firebase Analytics is used
-  // measurementId: "YOUR_MEASUREMENT_ID_HERE",
-};
-*/
-
-const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
-const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-
-// Log a prominent error if essential Firebase config variables are missing.
-// This helps in diagnosing "Internal Server Error" if env vars are not set.
-if (!apiKey || !authDomain || !projectId) {
-  console.error(
-    'CRITICAL_FIREBASE_CONFIG_ERROR: Missing essential Firebase configuration. ' +
-    'Please ensure NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, ' +
-    'and NEXT_PUBLIC_FIREBASE_PROJECT_ID are correctly set in your environment variables ' +
-    '(.env.local for local development, or in your hosting provider settings for deployment). ' +
-    `Details - API_KEY_PRESENT: ${!!apiKey}, AUTH_DOMAIN_PRESENT: ${!!authDomain}, PROJECT_ID_PRESENT: ${!!projectId}`
-  );
-}
-
-// Option 2: Using Environment Variables (RECOMMENDED FOR PRODUCTION)
-const firebaseConfig: FirebaseOptions = {
-  apiKey: apiKey,
-  authDomain: authDomain,
-  projectId: projectId,
+const firebaseConfigValues = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Optional
 };
 
+const requiredEnvVars: (keyof typeof firebaseConfigValues)[] = [
+  'apiKey',
+  'authDomain',
+  'projectId',
+  // storageBucket, messagingSenderId, appId are often important but might not be strictly required for auth/firestore initialization.
+  // Add them here if they become critical for your app's core functionality.
+];
+
+const missingVars = requiredEnvVars.filter(key => {
+  const value = firebaseConfigValues[key];
+  return !value || value.trim() === "";
+});
+
+if (missingVars.length > 0) {
+  const errorMessage =
+    `CRITICAL_FIREBASE_CONFIG_ERROR: Essential Firebase configuration environment variables are missing or empty. ` +
+    `Please ensure the following environment variables are correctly set with non-empty values: ${missingVars.map(v => `NEXT_PUBLIC_FIREBASE_${v.toUpperCase()}`).join(', ')}. ` +
+    'Check .env.local for local development, or your hosting provider settings (e.g., Netlify) for deployment. ' +
+    `Current Values (masked for security if present): ${requiredEnvVars.map(k => `${k}: ${firebaseConfigValues[k] ? 'SET' : 'MISSING_OR_EMPTY'}`).join(', ')}`;
+  
+  console.error(errorMessage);
+  // Note: Throwing an error here might be too disruptive if some parts of the app can run without full Firebase.
+  // However, for an auth/invalid-api-key, it's likely auth is fundamental.
+  // Depending on the app's needs, you might throw here or handle it more gracefully.
+  // For now, the console error should be prominent.
+}
+
+
+const firebaseConfig: FirebaseOptions = {
+  apiKey: firebaseConfigValues.apiKey,
+  authDomain: firebaseConfigValues.authDomain,
+  projectId: firebaseConfigValues.projectId,
+  storageBucket: firebaseConfigValues.storageBucket,
+  messagingSenderId: firebaseConfigValues.messagingSenderId,
+  appId: firebaseConfigValues.appId,
+  measurementId: firebaseConfigValues.measurementId,
+};
+
 
 // Initialize Firebase
 // This pattern prevents re-initializing the app on hot reloads
 const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth: Auth = getAuth(app);
+// The next line (getAuth) is where "auth/invalid-api-key" will typically throw if the apiKey in firebaseConfig is bad
+const auth: Auth = getAuth(app); 
 const db: Firestore = getFirestore(app);
 
 export { app, auth, db };
