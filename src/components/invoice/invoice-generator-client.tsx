@@ -402,5 +402,4 @@ export function InvoiceGeneratorClient() {
   );
 }
 
-
     
