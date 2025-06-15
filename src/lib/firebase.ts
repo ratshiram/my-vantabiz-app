@@ -4,10 +4,10 @@ import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 // !! IMPORTANT !!
-// If you are seeing "Firebase: Error (auth/invalid-api-key)", TRIPLE-CHECK that the value for
-// NEXT_PUBLIC_FIREBASE_API_KEY in your .env.local file (for local development)
-// is EXACTLY CORRECT and matches the API Key from your Firebase project console.
-// (Project settings > General > Your apps > SDK setup and configuration > Config > apiKey)
+// If you are seeing "Firebase: Error (auth/invalid-api-key)" or "auth/api-key-not-valid",
+// TRIPLE-CHECK that the value for NEXT_PUBLIC_FIREBASE_API_KEY in your .env.local file
+// (for local development) is EXACTLY CORRECT and matches the API Key from your
+// Firebase project console. (Project settings > General > Your apps > SDK setup and configuration > Config > apiKey)
 // Also, ensure the variable is not an empty string or just whitespace.
 // =================================================================================================
 
@@ -21,15 +21,16 @@ const firebaseConfigValues = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Optional
 };
 
-// Maps the internal keys of firebaseConfigValues to the exact environment variable names.
+// Maps the internal keys of firebaseConfigValues to the exact environment variable names
+// for more helpful error messages.
 const expectedEnvVarNames: Record<keyof typeof firebaseConfigValues, string> = {
-  apiKey: 'AIzaSyBwJh2-CUhm7qE2C8NMEytfQm7sbxzKfUc',
-  authDomain: 'fintrack-lite-10936.firebaseapp.com',
-  projectId: 'fintrack-lite-10936',
-  storageBucket: 'fintrack-lite-10936.firebasestorage.app',
-  messagingSenderId: '44749033941',
-  appId: '1:44749033941:web:fa9dbebe835f2977932d5c',
-  measurementId: 'G-HR7ZDD6THC',
+  apiKey: 'NEXT_PUBLIC_FIREBASE_API_KEY',
+  authDomain: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+  projectId: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+  storageBucket: 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+  messagingSenderId: 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+  appId: 'NEXT_PUBLIC_FIREBASE_APP_ID',
+  measurementId: 'NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID',
 };
 
 const requiredConfigKeys: (keyof typeof firebaseConfigValues)[] = [
@@ -46,24 +47,25 @@ const missingOrEmptyVars = requiredConfigKeys.filter(key => {
 
 if (missingOrEmptyVars.length > 0) {
   const missingVarDetails = missingOrEmptyVars
-    .map(key => expectedEnvVarNames[key]) 
+    .map(key => expectedEnvVarNames[key])
     .join(', ');
 
   const currentValuesDetails = requiredConfigKeys
     .map(key => {
-      const envVarName = expectedEnvVarNames[key]; 
-      const value = firebaseConfigValues[key];    
+      const envVarName = expectedEnvVarNames[key];
+      const value = firebaseConfigValues[key];
       return `${envVarName}: ${value && String(value).trim() !== "" ? 'SET_BUT_POSSIBLY_INVALID' : 'MISSING_OR_EMPTY'}`;
     })
     .join(', ');
 
   const errorMessage =
     `CRITICAL_FIREBASE_CONFIG_ERROR: Essential Firebase configuration environment variables are missing or empty. ` +
-    `Please ensure the following environment variables are correctly set with non-empty values: ${missingVarDetails}. ` +
-    'Check your .env.local file (for local development). ' +
+    `Please ensure the following environment variables are correctly set with non-empty values in your .env.local file: ${missingVarDetails}. ` +
     `Current Status of Required Variables (based on process.env access): ${currentValuesDetails}.`;
   
   console.error(errorMessage);
+  // This console.error will be visible in your server logs (local terminal).
+  // The try-catch below will handle the actual initialization failure if critical config is truly missing.
 }
 
 const firebaseConfig: FirebaseOptions = {
@@ -99,7 +101,11 @@ try {
     ])
   );
   console.error("Firebase Config Object Passed to initializeApp (values derived from process.env):", configPassedToInitStatus);
+  // Re-throw the error to ensure the application doesn't proceed with a broken Firebase setup.
+  // This also makes it clear in the console that initialization failed.
   throw error; 
 }
 
 export { app, auth, db };
+
+    
