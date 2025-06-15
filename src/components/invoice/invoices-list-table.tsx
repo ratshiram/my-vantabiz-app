@@ -31,22 +31,21 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = pageMargin;
 
-    if (invoice.logoUrl) {
+    if (invoice.logoUrl && invoice.logoUrl.trim()) { // Check if logoUrl is not null, undefined, or empty/whitespace
       try {
         const imgTypeMatch = invoice.logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
             const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
             
             const image = new Image();
-             // Wrap image loading in a promise to handle success/failure
             await new Promise<void>((resolve, reject) => {
               image.onload = () => resolve();
               image.onerror = (err) => {
                 console.error("Image load error for PDF:", err);
-                toast({ title: "Logo Error", description: "Could not load logo image for PDF.", variant: "destructive" });
+                toast({ title: "Logo Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
                 reject(new Error("Image load error"));
               };
-              image.src = invoice.logoUrl; // This is line 96
+              image.src = invoice.logoUrl; // Line 49 in the component
             });
 
             const logoMaxHeight = 15;
@@ -65,15 +64,21 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
                 imgWidth = imgWidth * ratio;
             }
             
-            doc.addImage(invoice.logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
-            currentY += imgHeight + 5; 
+            // Wrap doc.addImage in a try-catch
+            try {
+                doc.addImage(invoice.logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
+                currentY += imgHeight + 5; 
+            } catch (addImgError) {
+                console.error("jsPDF.addImage error:", addImgError);
+                toast({ title: "PDF Logo Error", description: "Failed to add logo to PDF. The image data might be corrupted.", variant: "destructive" });
+            }
         } else {
             console.warn("Invoice logoUrl is not a valid data URI or unsupported image type.");
-            toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF.", variant: "default" });
+            toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
         }
       } catch (e) {
+        // Error already handled by promise reject or addImage catch
         console.error("Error processing logo for PDF from saved invoice:", e);
-        // Toast might have already been shown by the promise reject
       }
     }
 
@@ -91,7 +96,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
 
     const receiptInfoX = pageWidth - pageMargin;
     let receiptBlockY = pageMargin; 
-    if (invoice.logoUrl) receiptBlockY = pageMargin; 
+    if (invoice.logoUrl && invoice.logoUrl.trim()) receiptBlockY = pageMargin; 
     else receiptBlockY = Math.max(pageMargin, currentY - (invoice.taxId ? 17 : 12) ); 
 
     doc.setFontSize(14).setFont(undefined, 'bold');
@@ -115,14 +120,14 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     currentY += 10;
 
     const tableColumn = ["Description", "Amount"];
-    const tableRows = invoice.services.map(service => [
+    const tableRowsData = invoice.services.map(service => [
       service.description,
       `$${Number(service.amount).toFixed(2)}`
     ]);
 
     autoTable(doc, {
       head: [tableColumn],
-      body: tableRows,
+      body: tableRowsData,
       startY: currentY,
       theme: 'striped',
       headStyles: { fillColor: [70, 128, 144] }, 
@@ -130,15 +135,12 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
       },
-      didDrawPage: (data) => { 
-        currentY = data.cursor?.y || currentY;
-      }
+      // didDrawPage is not the most reliable for finalY, prefer lastAutoTable.finalY
     });
     
-    let tableEndY = currentY;
-    const docWithAutoTable = doc as jsPDF & { lastAutoTable?: { finalY?: number } };
-    if (docWithAutoTable.lastAutoTable && typeof docWithAutoTable.lastAutoTable.finalY === 'number') {
-      tableEndY = docWithAutoTable.lastAutoTable.finalY;
+    let tableEndY = (doc as any).lastAutoTable?.finalY || currentY;
+    if (tableRowsData.length === 0) { // If table was empty, finalY might be startY
+        tableEndY = currentY;
     }
     currentY = tableEndY + 10;
 

@@ -32,6 +32,8 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     if (typeof window === 'undefined') return;
 
     const doc = new jsPDF();
+    const pageMargin = 14;
+    let currentY = pageMargin; // Renamed from initialY for clarity
 
     const filteredTransactions = sortedTransactions.filter(transaction => {
       const transactionDate = new Date(transaction.date);
@@ -53,7 +55,8 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     const profitOrLoss = totalIncome - totalExpenses;
 
     doc.setFontSize(18);
-    doc.text("Transaction Report", 14, 22);
+    doc.text("Transaction Report", pageMargin, currentY + 8); // Adjusted Y
+    currentY += 8;
     doc.setFontSize(10);
     doc.setTextColor(100);
     
@@ -65,8 +68,10 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     } else if (endDate) {
       reportDateRangeString = `Up to ${format(endDate, "yyyy-MM-dd")}`;
     }
-    doc.text(`Date Range: ${reportDateRangeString}`, 14, 29);
-    doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 36);
+    currentY += 7;
+    doc.text(`Date Range: ${reportDateRangeString}`, pageMargin, currentY);
+    currentY += 7;
+    doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, pageMargin, currentY);
 
 
     const tableColumn = ["Date", "Description", "Category", "Type", "Amount"];
@@ -82,11 +87,13 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       ];
       tableRows.push(transactionData);
     });
+    
+    const mainTableStartY = currentY + 6; // Start table after header text
 
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 42, 
+      startY: mainTableStartY, 
       theme: 'striped',
       headStyles: { fillColor: [22, 160, 133] },
       alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -100,15 +107,16 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       }
     });
 
-    let tableEndY = 50; 
-    const docWithAutoTable = doc as jsPDF & { lastAutoTable?: { finalY?: number } };
-    if (docWithAutoTable.lastAutoTable && typeof docWithAutoTable.lastAutoTable.finalY === 'number') {
-      tableEndY = docWithAutoTable.lastAutoTable.finalY;
+    // Use jsPDF-AutoTable's recommended way to get the Y position after the table
+    let tableEndY = (doc as any).lastAutoTable?.finalY || mainTableStartY;
+    if (tableRows.length === 0) { // If table was empty, finalY might be startY
+        tableEndY = mainTableStartY;
     }
-    let finalY = tableEndY > 0 ? tableEndY : 50; // Ensure finalY is positive
+    currentY = tableEndY; // This is the Y position after the main transaction table.
 
     doc.setFontSize(12);
-    doc.text("Summary:", 14, finalY + 10);
+    doc.setTextColor(0); // Reset text color
+    doc.text("Summary:", pageMargin, currentY + 10); // Use currentY which is now accurately after the table
     
     const summaryData = [
         ["Total Income:", `$${totalIncome.toFixed(2)}`],
@@ -116,9 +124,11 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
         ["Profit / Loss:", `$${profitOrLoss.toFixed(2)}`]
     ];
     
-    const summaryTableStartY = finalY + 15; // Adjusted startY for summary table
+    const summaryTableStartY = currentY + 15; // Position summary table after the "Summary:" text
     const pageWidth = doc.internal.pageSize.getWidth();
-    const summaryTableMarginLeft = Math.max(14, pageWidth - 80); // Ensure margin is reasonable
+    // Adjust summary table margin for better positioning if needed
+    const summaryTableMarginLeft = Math.max(pageMargin, pageWidth - 80 - pageMargin);
+
 
     autoTable(doc, {
         body: summaryData,

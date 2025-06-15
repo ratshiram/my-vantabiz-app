@@ -129,7 +129,7 @@ export function InvoiceGeneratorClient() {
     }
     tfootHtml += `<tr style="font-weight: bold; color: #111827;"><td style="padding-top: 8px; padding-right: 16px; text-align: right;">Total Paid</td><td style="text-align: right; padding-top: 8px; padding-left: 16px;">$${totalAmount.toFixed(2)}</td></tr>`;
     
-    const logoDisplayHtml = logoUrl ? `<img src="${logoUrl}" alt="Business Logo" style="margin-bottom: 1rem; max-height: 4rem; max-width: 10rem; object-fit: contain;">` : '';
+    const logoDisplayHtml = (logoUrl && logoUrl.trim()) ? `<img src="${logoUrl}" alt="Business Logo" style="margin-bottom: 1rem; max-height: 4rem; max-width: 10rem; object-fit: contain;">` : '';
     
     const html = `<div style="font-family: 'Inter', Arial, sans-serif; font-size: 12px; padding: 20px; color: #374151; max-width: 800px; margin: auto; border: 1px solid #e5e7eb; background: white;">
                     ${logoDisplayHtml}
@@ -182,7 +182,7 @@ export function InvoiceGeneratorClient() {
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = pageMargin;
 
-    if (logoUrl) {
+    if (logoUrl && logoUrl.trim()) { // Check if logoUrl is not null, undefined, or empty/whitespace
       try {
         const imgTypeMatch = logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
@@ -190,15 +190,14 @@ export function InvoiceGeneratorClient() {
             
             const image = new Image();
             
-            // Wrap image loading in a promise to handle success/failure
             await new Promise<void>((resolve, reject) => {
               image.onload = () => resolve();
               image.onerror = (err) => {
                 console.error("Image load error for PDF:", err);
-                toast({ title: "Logo Error", description: "Could not load logo image for PDF.", variant: "destructive" });
+                toast({ title: "Logo Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
                 reject(new Error("Image load error"));
               };
-              image.src = logoUrl; 
+              image.src = logoUrl; // This is line 248 in the component
             });
 
             const logoMaxHeight = 15; 
@@ -216,15 +215,21 @@ export function InvoiceGeneratorClient() {
                 imgHeight = logoMaxHeight;
                 imgWidth = imgWidth * ratio;
             }
-            doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight); 
-            currentY += imgHeight + 5;
+             // Wrap doc.addImage in a try-catch as well, as it can fail with malformed data URIs
+            try {
+                doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight); 
+                currentY += imgHeight + 5;
+            } catch (addImgError) {
+                console.error("jsPDF.addImage error:", addImgError);
+                toast({ title: "PDF Logo Error", description: "Failed to add logo to PDF. The image data might be corrupted.", variant: "destructive" });
+            }
         } else {
-            console.warn("Unsupported image type for PDF logo or invalid data URI.");
-            toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF.", variant: "default" });
+            console.warn("Unsupported image type for PDF logo or invalid data URI format.");
+            toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
         }
       } catch (e) {
+        // Error already handled by the promise reject toast or addImage catch
         console.error("Error processing logo for PDF", e);
-        // Toast is already shown in the promise reject
       }
     }
     
@@ -241,7 +246,7 @@ export function InvoiceGeneratorClient() {
 
     const receiptInfoX = pageWidth - pageMargin;
     let receiptBlockY = pageMargin; 
-    if (logoUrl) receiptBlockY = pageMargin; 
+    if (logoUrl && logoUrl.trim()) receiptBlockY = pageMargin; 
     else receiptBlockY = Math.max(pageMargin, currentY - (businessTaxId ? 17 : 12) );
 
 
@@ -266,14 +271,14 @@ export function InvoiceGeneratorClient() {
     currentY += 10;
 
     const tableColumn = ["Description", "Amount"];
-    const tableRows = serviceItems.map(item => [
+    const tableRowsData = serviceItems.map(item => [
       item.description,
       `$${Number(item.amount).toFixed(2)}`
     ]);
 
     autoTable(doc, {
       head: [tableColumn],
-      body: tableRows,
+      body: tableRowsData,
       startY: currentY,
       theme: 'striped',
       headStyles: { fillColor: [70, 128, 144] }, 
@@ -281,17 +286,16 @@ export function InvoiceGeneratorClient() {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
       },
-      didDrawPage: (data) => { 
-        currentY = data.cursor?.y || currentY;
-      }
+      // didDrawPage is not the most reliable for finalY, prefer lastAutoTable.finalY
     });
     
-    let tableEndY = currentY;
-    const docWithAutoTable = doc as jsPDF & { lastAutoTable?: { finalY?: number } };
-    if (docWithAutoTable.lastAutoTable && typeof docWithAutoTable.lastAutoTable.finalY === 'number') {
-      tableEndY = docWithAutoTable.lastAutoTable.finalY;
+    // Get Y position after autoTable
+    let tableEndY = (doc as any).lastAutoTable?.finalY || currentY;
+     if (tableRowsData.length === 0) { // If table was empty, finalY might be startY
+        tableEndY = currentY; // Keep currentY if table had no content
     }
     currentY = tableEndY + 10;
+
 
     const totalsX = pageWidth - pageMargin - 70; 
     doc.setFontSize(10);
@@ -377,6 +381,7 @@ export function InvoiceGeneratorClient() {
       });
     } catch (error) {
       console.error("Failed to save business info from client:", error);
+      // Toast for error is handled within updateUserBusinessDetails or here if specific client error
     } finally {
       setIsSavingBusinessInfo(false);
     }

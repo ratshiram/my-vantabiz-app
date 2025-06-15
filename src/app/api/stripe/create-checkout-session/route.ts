@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session.id) {
-        throw new Error('Failed to create Stripe session.');
+        console.error('Failed to create Stripe session, session.id is missing.');
+        return NextResponse.json({ error: 'Failed to create Stripe session ID.' }, { status: 500 });
     }
 
     return NextResponse.json({ sessionId: session.id });
