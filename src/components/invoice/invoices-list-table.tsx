@@ -39,10 +39,9 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
         try {
           await new Promise<void>((resolve, reject) => {
             image.onload = () => resolve();
-            image.onerror = (errEvt) => { // Changed variable name to avoid conflict
+            image.onerror = (errEvt) => { 
               console.error("Image load error for PDF (list-table):", errEvt);
-              toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
-              reject(new Error("Image load error for PDF generation")); // This rejection will be caught by the outer try-catch
+              reject(new Error("Image load error for PDF generation")); 
             };
             image.src = invoice.logoUrl;
           });
@@ -66,11 +65,8 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
           doc.addImage(invoice.logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
           currentY += imgHeight + 5;
         } catch (imgLoadOrAddError) {
-          // Error already toasted in image.onerror if it's an image load error.
-          // If it's another error (e.g., from doc.addImage), log it.
-          if (!(imgLoadOrAddError instanceof Error && imgLoadOrAddError.message === "Image load error for PDF generation")) {
-            console.error("Error processing logo for PDF (list-table):", imgLoadOrAddError);
-          }
+           toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
+           console.error("Error processing logo for PDF (list-table):", imgLoadOrAddError);
         }
       } else {
         console.warn("Invoice logoUrl is not a valid data URI or unsupported image type (list-table).");
@@ -219,4 +215,3 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     </Card>
   );
 }
-

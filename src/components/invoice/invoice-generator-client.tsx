@@ -194,8 +194,7 @@ export function InvoiceGeneratorClient() {
             image.onload = () => resolve();
             image.onerror = (errEvt) => {
               console.error("Image load error for PDF (generator):", errEvt);
-              toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
-              reject(new Error("Image load error for PDF generation")); // This rejection will be caught by the outer try-catch
+              reject(new Error("Image load error for PDF generation")); 
             };
             image.src = logoUrl;
           });
@@ -218,11 +217,8 @@ export function InvoiceGeneratorClient() {
           doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
           currentY += imgHeight + 5;
         } catch (imgLoadOrAddError) {
-          // Error already toasted in image.onerror if it's an image load error.
-          // If it's another error (e.g., from doc.addImage), log it.
-          if (!(imgLoadOrAddError instanceof Error && imgLoadOrAddError.message === "Image load error for PDF generation")) {
-            console.error("Error processing logo for PDF (generator):", imgLoadOrAddError);
-          }
+           toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
+           console.error("Error processing logo for PDF (generator):", imgLoadOrAddError);
         }
       } else {
         console.warn("Unsupported image type for PDF logo or invalid data URI format (generator).");
@@ -510,4 +506,3 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
-
