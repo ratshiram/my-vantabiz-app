@@ -47,8 +47,9 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
   const [clientDefaultDate, setClientDefaultDate] = React.useState<Date | undefined>(propDefaultDate);
 
   useEffect(() => {
+    // Set clientDefaultDate only on the client, after mount
     setClientDefaultDate(new Date());
-  }, []);
+  }, []); // Empty dependency array ensures this runs once on mount client-side
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -60,18 +61,17 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
     },
   });
   
+  // This useEffect resets the form when clientDefaultDate is set (which happens once on mount)
   useEffect(() => {
     if (clientDefaultDate) {
       form.reset({
         description: "",
-        amount: '' as unknown as number, // Reset with empty string
+        amount: '', // Reset with empty string
         category: "",
         date: clientDefaultDate,
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientDefaultDate, form.reset ]); // form was missing from dependency array, added form.reset
-
+  }, [clientDefaultDate, form.reset]); // Dependencies: clientDefaultDate and form.reset
 
   const categories = type === "income" ? incomeCategories : expenseCategories;
 
@@ -82,10 +82,10 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
       description: `${values.description} - $${Number(values.amount).toFixed(2)}`,
       variant: "default",
     });
-    if (clientDefaultDate) {
+    if (clientDefaultDate) { // Use the same clientDefaultDate for consistency
        form.reset({
         description: "",
-        amount: '' as unknown as number, // Reset with empty string
+        amount: '', // Reset with empty string
         category: "",
         date: clientDefaultDate,
       });
@@ -156,7 +156,15 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
                   step="0.01" 
                   {...field} 
                   value={field.value === undefined || field.value === null || Number.isNaN(field.value) ? '' : String(field.value)}
-                  onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      field.onChange(''); // Allow empty string to clear the field
+                    } else {
+                      const num = parseFloat(val);
+                      field.onChange(Number.isNaN(num) ? '' : num); // Pass number or empty string if not a valid number
+                    }
+                  }}
                 />
               </FormControl>
               <FormMessage />
@@ -169,7 +177,7 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value || ""}> {/* Ensure value is not undefined */}
+              <Select onValueChange={field.onChange} value={field.value || ""}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a category" />
@@ -205,4 +213,3 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
     </Form>
   );
 }
-
