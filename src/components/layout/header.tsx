@@ -4,8 +4,8 @@ import Image from 'next/image';
 
 export function AppHeader() {
   return (
-    <header className="text-center py-6 sm:py-8 bg-card border-b border-border">
-      <div className="relative mx-auto w-auto h-20 sm:h-24">
+    <header className="flex flex-col items-center py-6 sm:py-8 bg-card border-b border-border">
+      <div className="relative w-auto h-20 sm:h-24">
         <Image
           src="/vantabizlogo.png"
           alt="VantaBiz Logo"
@@ -15,7 +15,7 @@ export function AppHeader() {
           priority
         />
       </div>
-      <p className="text-md sm:text-lg text-foreground mt-2 sm:mt-3 font-medium">Your All-in-One Business Toolkit</p>
+      <p className="text-md sm:text-lg text-foreground mt-2 sm:mt-3 font-medium text-center">Your All-in-One Business Toolkit</p>
     </header>
   );
 }
