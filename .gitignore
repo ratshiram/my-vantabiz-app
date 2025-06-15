@@ -5,56 +5,51 @@
 /node_modules
 /.pnp
 .pnp.js
-.yarn/install-state.gz
 
-# Transpiled JavaScript files
-# (created by webpack, babel, tsc, etc.)
-*.generated.js
-*.generated.ts
+# Testing
+/coverage
 
-# TypeScript cache
-*.tsbuildinfo
-
-# Output of 'next export'
-/out
-
-# Next.js build outputs
+# Next.js build output
 /.next/
-/build/
+/out/
 
-# Docusaurus build outputs
-/.docusaurus/
+# Minified files / Compilation output
+/dist
+*.js.map
+*.css.map
 
-# Firebase
-.firebase/
-firebase-debug.log
-*.log
+# Production
+/build
 
 # Misc
 .DS_Store
 *.pem
-*.env
+
+# Local Environment Variables
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
+# Log files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
 # Editor directories and files
-.idea
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-*.sublime-workspace
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# Optional eslint cache
-.eslintcache
-
-# Optional SvelteKit cache
-.svelte-kit
+# Firebase
+.firebase
+firebase-debug.log
