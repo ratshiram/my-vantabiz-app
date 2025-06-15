@@ -31,54 +31,60 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = pageMargin;
 
-    if (invoice.logoUrl && invoice.logoUrl.trim()) { // Check if logoUrl is not null, undefined, or empty/whitespace
+    if (invoice.logoUrl && invoice.logoUrl.trim()) {
       try {
         const imgTypeMatch = invoice.logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
             const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
             
             const image = new Image();
-            await new Promise<void>((resolve, reject) => {
-              image.onload = () => resolve();
-              image.onerror = (err) => {
-                console.error("Image load error for PDF:", err);
-                toast({ title: "Logo Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
-                reject(new Error("Image load error"));
-              };
-              image.src = invoice.logoUrl; // Line 49 in the component
-            });
-
-            const logoMaxHeight = 15;
-            const logoMaxWidth = 40;
-            let imgWidth = image.naturalWidth;
-            let imgHeight = image.naturalHeight;
-
-            if (imgWidth > logoMaxWidth) {
-                const ratio = logoMaxWidth / imgWidth;
-                imgWidth = logoMaxWidth;
-                imgHeight = imgHeight * ratio;
-            }
-            if (imgHeight > logoMaxHeight) {
-                const ratio = logoMaxHeight / imgHeight;
-                imgHeight = logoMaxHeight;
-                imgWidth = imgWidth * ratio;
-            }
             
-            // Wrap doc.addImage in a try-catch
+            // Wrap the promise in its own try-catch to specifically handle image load errors
             try {
-                doc.addImage(invoice.logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
+                await new Promise<void>((resolve, reject) => {
+                  image.onload = () => resolve();
+                  image.onerror = (err) => { // This block is for image load failure
+                    console.error("Image load error for PDF (list-table):", err);
+                    toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
+                    reject(new Error("Image load error for PDF generation")); 
+                  };
+                  image.src = invoice.logoUrl!; // Non-null assertion is okay due to prior check
+                });
+
+                // If promise resolved (image loaded), proceed to calculate dimensions and add
+                const logoMaxHeight = 15;
+                const logoMaxWidth = 40;
+                let imgWidth = image.naturalWidth;
+                let imgHeight = image.naturalHeight;
+
+                if (imgWidth > logoMaxWidth) {
+                    const ratio = logoMaxWidth / imgWidth;
+                    imgWidth = logoMaxWidth;
+                    imgHeight = imgHeight * ratio;
+                }
+                if (imgHeight > logoMaxHeight) {
+                    const ratio = logoMaxHeight / imgHeight;
+                    imgHeight = logoMaxHeight;
+                    imgWidth = imgWidth * ratio;
+                }
+                
+                doc.addImage(invoice.logoUrl!, imgType, pageMargin, currentY, imgWidth, imgHeight);
                 currentY += imgHeight + 5; 
-            } catch (addImgError) {
-                console.error("jsPDF.addImage error:", addImgError);
-                toast({ title: "PDF Logo Error", description: "Failed to add logo to PDF. The image data might be corrupted.", variant: "destructive" });
+
+            } catch (imgLoadOrAddError) {
+                // This catch block handles rejections from the new Promise (e.g., image.onerror)
+                // Or potentially errors from doc.addImage if it were moved inside and failed
+                console.error("Error during image loading or adding to PDF (list-table):", imgLoadOrAddError);
+                // Toast for image load error is already handled by image.onerror, so no redundant toast here unless specifically for addImage issues
             }
         } else {
-            console.warn("Invoice logoUrl is not a valid data URI or unsupported image type.");
+            console.warn("Invoice logoUrl is not a valid data URI or unsupported image type (list-table).");
             toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
         }
       } catch (e) {
-        // Error already handled by promise reject or addImage catch
-        console.error("Error processing logo for PDF from saved invoice:", e);
+        // This is a fallback catch for the entire logo processing block
+        console.error("Outer error processing logo for PDF (list-table)", e);
+        toast({ title: "Logo Processing Error", description: "An unexpected error occurred while preparing the logo.", variant: "destructive" });
       }
     }
 
@@ -135,11 +141,10 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
       },
-      // didDrawPage is not the most reliable for finalY, prefer lastAutoTable.finalY
     });
     
     let tableEndY = (doc as any).lastAutoTable?.finalY || currentY;
-    if (tableRowsData.length === 0) { // If table was empty, finalY might be startY
+    if (tableRowsData.length === 0) { 
         tableEndY = currentY;
     }
     currentY = tableEndY + 10;
@@ -218,3 +223,4 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     </Card>
   );
 }
+

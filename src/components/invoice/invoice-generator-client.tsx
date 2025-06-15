@@ -182,7 +182,7 @@ export function InvoiceGeneratorClient() {
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = pageMargin;
 
-    if (logoUrl && logoUrl.trim()) { // Check if logoUrl is not null, undefined, or empty/whitespace
+    if (logoUrl && logoUrl.trim()) {
       try {
         const imgTypeMatch = logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
@@ -190,46 +190,51 @@ export function InvoiceGeneratorClient() {
             
             const image = new Image();
             
-            await new Promise<void>((resolve, reject) => {
-              image.onload = () => resolve();
-              image.onerror = (err) => {
-                console.error("Image load error for PDF:", err);
-                toast({ title: "Logo Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
-                reject(new Error("Image load error"));
-              };
-              image.src = logoUrl; // This is line 248 in the component
-            });
-
-            const logoMaxHeight = 15; 
-            const logoMaxWidth = 40;  
-            let imgWidth = image.naturalWidth;
-            let imgHeight = image.naturalHeight;
-
-            if (imgWidth > logoMaxWidth) {
-                const ratio = logoMaxWidth / imgWidth;
-                imgWidth = logoMaxWidth;
-                imgHeight = imgHeight * ratio;
-            }
-            if (imgHeight > logoMaxHeight) {
-                const ratio = logoMaxHeight / imgHeight;
-                imgHeight = logoMaxHeight;
-                imgWidth = imgWidth * ratio;
-            }
-             // Wrap doc.addImage in a try-catch as well, as it can fail with malformed data URIs
+            // Wrap the promise in its own try-catch to specifically handle image load errors
             try {
+                await new Promise<void>((resolve, reject) => {
+                  image.onload = () => resolve();
+                  image.onerror = (err) => {
+                    console.error("Image load error for PDF (generator):", err);
+                    toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
+                    reject(new Error("Image load error for PDF generation")); 
+                  };
+                  image.src = logoUrl; 
+                });
+
+                const logoMaxHeight = 15; 
+                const logoMaxWidth = 40;  
+                let imgWidth = image.naturalWidth;
+                let imgHeight = image.naturalHeight;
+
+                if (imgWidth > logoMaxWidth) {
+                    const ratio = logoMaxWidth / imgWidth;
+                    imgWidth = logoMaxWidth;
+                    imgHeight = imgHeight * ratio;
+                }
+                if (imgHeight > logoMaxHeight) {
+                    const ratio = logoMaxHeight / imgHeight;
+                    imgHeight = logoMaxHeight;
+                    imgWidth = imgWidth * ratio;
+                }
                 doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight); 
                 currentY += imgHeight + 5;
-            } catch (addImgError) {
-                console.error("jsPDF.addImage error:", addImgError);
-                toast({ title: "PDF Logo Error", description: "Failed to add logo to PDF. The image data might be corrupted.", variant: "destructive" });
+
+            } catch (imgLoadOrAddError) {
+                // This catch block handles rejections from the new Promise (e.g., image.onerror)
+                // or errors from doc.addImage if it's moved inside this specific try-catch
+                console.error("Error during image loading or adding to PDF (generator):", imgLoadOrAddError);
+                // Toast for image load error is already handled in image.onerror
+                // If doc.addImage fails, we might want a specific toast here or rely on the onerror toast.
             }
         } else {
-            console.warn("Unsupported image type for PDF logo or invalid data URI format.");
+            console.warn("Unsupported image type for PDF logo or invalid data URI format (generator).");
             toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
         }
       } catch (e) {
-        // Error already handled by the promise reject toast or addImage catch
-        console.error("Error processing logo for PDF", e);
+        // This is a fallback catch for the entire logo processing block, though specific errors should be caught above.
+        console.error("Outer error processing logo for PDF (generator)", e);
+        toast({ title: "Logo Processing Error", description: "An unexpected error occurred while preparing the logo.", variant: "destructive" });
       }
     }
     
@@ -286,13 +291,11 @@ export function InvoiceGeneratorClient() {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
       },
-      // didDrawPage is not the most reliable for finalY, prefer lastAutoTable.finalY
     });
     
-    // Get Y position after autoTable
     let tableEndY = (doc as any).lastAutoTable?.finalY || currentY;
-     if (tableRowsData.length === 0) { // If table was empty, finalY might be startY
-        tableEndY = currentY; // Keep currentY if table had no content
+     if (tableRowsData.length === 0) { 
+        tableEndY = currentY; 
     }
     currentY = tableEndY + 10;
 
@@ -381,7 +384,6 @@ export function InvoiceGeneratorClient() {
       });
     } catch (error) {
       console.error("Failed to save business info from client:", error);
-      // Toast for error is handled within updateUserBusinessDetails or here if specific client error
     } finally {
       setIsSavingBusinessInfo(false);
     }
@@ -511,3 +513,4 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
+

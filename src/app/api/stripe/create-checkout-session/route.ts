@@ -8,13 +8,13 @@ export async function POST(req: NextRequest) {
     const proPriceId = process.env.STRIPE_PRO_PRICE_ID;
 
     if (!stripeSecretKey) {
-      console.error("STRIPE_SECRET_KEY is not set in environment variables.");
-      return NextResponse.json({ error: 'Stripe Secret Key is not configured.' }, { status: 500 });
+      console.error("CRITICAL: STRIPE_SECRET_KEY is not set in environment variables.");
+      return NextResponse.json({ error: 'Stripe Secret Key is not configured. Please check server environment variables.' }, { status: 500 });
     }
 
     if (!proPriceId) {
-      console.error("STRIPE_PRO_PRICE_ID is not set in environment variables.");
-      return NextResponse.json({ error: 'Stripe Pro Price ID is not configured.' }, { status: 500 });
+      console.error("CRITICAL: STRIPE_PRO_PRICE_ID is not set in environment variables.");
+      return NextResponse.json({ error: 'Stripe Pro Price ID is not configured. Please check server environment variables.' }, { status: 500 });
     }
     
     const stripe = new Stripe(stripeSecretKey, {
@@ -57,3 +57,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Failed to create checkout session: ${errorMessage}` }, { status: 500 });
   }
 }
+

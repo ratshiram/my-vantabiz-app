@@ -15,6 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { Transaction } from "@/lib/types";
 import { incomeCategories, expenseCategories } from "./transaction-form-shared";
 import { cn } from "@/lib/utils";
+import { useToast } from '@/hooks/use-toast';
+
 
 const categoryIcons = new Map([...incomeCategories, ...expenseCategories].map(cat => [cat.value, cat.icon]));
 
@@ -25,6 +27,7 @@ interface TransactionsTableProps {
 export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const { toast } = useToast(); 
 
   const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -33,7 +36,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
 
     const doc = new jsPDF();
     const pageMargin = 14;
-    let currentY = pageMargin; // Renamed from initialY for clarity
+    let currentY = pageMargin; 
 
     const filteredTransactions = sortedTransactions.filter(transaction => {
       const transactionDate = new Date(transaction.date);
@@ -55,7 +58,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     const profitOrLoss = totalIncome - totalExpenses;
 
     doc.setFontSize(18);
-    doc.text("Transaction Report", pageMargin, currentY + 8); // Adjusted Y
+    doc.text("Transaction Report", pageMargin, currentY + 8); 
     currentY += 8;
     doc.setFontSize(10);
     doc.setTextColor(100);
@@ -88,7 +91,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       tableRows.push(transactionData);
     });
     
-    const mainTableStartY = currentY + 6; // Start table after header text
+    const mainTableStartY = currentY + 6; 
 
     autoTable(doc, {
       head: [tableColumn],
@@ -107,16 +110,15 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       }
     });
 
-    // Use jsPDF-AutoTable's recommended way to get the Y position after the table
     let tableEndY = (doc as any).lastAutoTable?.finalY || mainTableStartY;
-    if (tableRows.length === 0) { // If table was empty, finalY might be startY
+    if (tableRows.length === 0) { 
         tableEndY = mainTableStartY;
     }
-    currentY = tableEndY; // This is the Y position after the main transaction table.
+    currentY = tableEndY; 
 
     doc.setFontSize(12);
-    doc.setTextColor(0); // Reset text color
-    doc.text("Summary:", pageMargin, currentY + 10); // Use currentY which is now accurately after the table
+    doc.setTextColor(0); 
+    doc.text("Summary:", pageMargin, currentY + 10); 
     
     const summaryData = [
         ["Total Income:", `$${totalIncome.toFixed(2)}`],
@@ -124,10 +126,16 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
         ["Profit / Loss:", `$${profitOrLoss.toFixed(2)}`]
     ];
     
-    const summaryTableStartY = currentY + 15; // Position summary table after the "Summary:" text
-    const pageWidth = doc.internal.pageSize.getWidth();
-    // Adjust summary table margin for better positioning if needed
-    const summaryTableMarginLeft = Math.max(pageMargin, pageWidth - 80 - pageMargin);
+    const summaryTableStartY = currentY + 15; 
+    
+    const pageWidthForSummary = doc.internal.pageSize.getWidth();
+    if (typeof pageWidthForSummary !== 'number' || pageWidthForSummary <= 0) {
+        console.error("Invalid pageWidth for PDF summary:", pageWidthForSummary);
+        toast({ title: "PDF Error", description: "Could not determine page width for PDF summary.", variant: "destructive" });
+        // Optionally, don't draw the summary table or use a default width
+    }
+
+    const summaryTableMarginLeft = Math.max(pageMargin, (pageWidthForSummary || 210) - 80 - pageMargin); // Use default A4 width if invalid
 
 
     autoTable(doc, {
@@ -229,7 +237,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
                     <TableCell className="px-4">{format(new Date(t.date), "MMM d, yyyy")}</TableCell>
                     <TableCell className="px-4">{t.description}</TableCell>
                     <TableCell className="flex items-center px-4">
-                      {categoryIcons.get(t.category) || null}
+                      {React.isValidElement(categoryIcons.get(t.category)) ? React.cloneElement(categoryIcons.get(t.category) as React.ReactElement, { className: "mr-2 h-4 w-4" }) : null}
                       <span className="ml-2">{t.category}</span>
                     </TableCell>
                     <TableCell
@@ -255,3 +263,4 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     </Card>
   );
 }
+
