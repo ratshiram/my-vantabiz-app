@@ -1,7 +1,7 @@
 
-import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp, type FirebaseOptions, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
 // IMPORTANT:
 // You MUST replace these placeholder values with your actual Firebase project configuration!
@@ -23,11 +23,27 @@ const firebaseConfig_hardcoded: FirebaseOptions = {
 };
 */
 
+const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
+// Log a prominent error if essential Firebase config variables are missing.
+// This helps in diagnosing "Internal Server Error" if env vars are not set.
+if (!apiKey || !authDomain || !projectId) {
+  console.error(
+    'CRITICAL_FIREBASE_CONFIG_ERROR: Missing essential Firebase configuration. ' +
+    'Please ensure NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, ' +
+    'and NEXT_PUBLIC_FIREBASE_PROJECT_ID are correctly set in your environment variables ' +
+    '(.env.local for local development, or in your hosting provider settings for deployment). ' +
+    `Details - API_KEY_PRESENT: ${!!apiKey}, AUTH_DOMAIN_PRESENT: ${!!authDomain}, PROJECT_ID_PRESENT: ${!!projectId}`
+  );
+}
+
 // Option 2: Using Environment Variables (RECOMMENDED FOR PRODUCTION)
 const firebaseConfig: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  apiKey: apiKey,
+  authDomain: authDomain,
+  projectId: projectId,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
@@ -37,8 +53,8 @@ const firebaseConfig: FirebaseOptions = {
 
 // Initialize Firebase
 // This pattern prevents re-initializing the app on hot reloads
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth: Auth = getAuth(app);
+const db: Firestore = getFirestore(app);
 
 export { app, auth, db };
