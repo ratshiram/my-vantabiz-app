@@ -2,15 +2,16 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'export', // Configure Next.js for static export
+  output: 'export', // Crucial for static export for Firebase Hosting
+  // Ensure errors are caught during build, not ignored
   typescript: {
-    ignoreBuildErrors: false, // Fail build on TypeScript errors
+    ignoreBuildErrors: false,
   },
   eslint: {
-    ignoreDuringBuilds: false, // Fail build on ESLint errors
+    ignoreDuringBuilds: false,
   },
   images: {
-    unoptimized: true, // Disable Next.js image optimization for static export
+    unoptimized: true, // Required for static export as Firebase doesn't run Next.js image optimization
     remotePatterns: [
       {
         protocol: 'https',
@@ -20,11 +21,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    allowedDevOrigins: [
-        'http://6000-firebase-studio-1749937401269.cluster-joak5ukfbnbyqspg4tewa33d24.cloudworkstations.dev'
-    ],
-  }
 };
 
 export default nextConfig;
