@@ -32,50 +32,48 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     let currentY = pageMargin;
 
     if (invoice.logoUrl && typeof invoice.logoUrl === 'string' && invoice.logoUrl.trim().startsWith('data:image/')) {
-      const currentLogoUrlConst: string = invoice.logoUrl; // Ensure it's a string for image.src
-      const imgTypeMatch = currentLogoUrlConst.match(/^data:image\/(png|jpeg|jpg);base64,/);
-      if (imgTypeMatch && imgTypeMatch[1]) {
-        const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
-        const image = new Image();
-        try {
-          await new Promise<void>((resolve, reject) => {
-            image.onload = () => resolve();
-            image.onerror = (errEvt) => {
-              console.error("Image load error for PDF (list-table):", errEvt);
-              reject(new Error("Image load error for PDF generation: Failed to load logo."));
-            };
-            if (typeof currentLogoUrlConst === 'string') { 
-                image.src = currentLogoUrlConst;
-            } else {
-                reject(new Error("Logo URL is not a string before assigning to image.src"));
+      const currentLogoUrlConst: string = invoice.logoUrl; 
+      if (typeof currentLogoUrlConst === 'string') { // Additional check to satisfy stricter TS
+        const imgTypeMatch = currentLogoUrlConst.match(/^data:image\/(png|jpeg|jpg);base64,/);
+        if (imgTypeMatch && imgTypeMatch[1]) {
+          const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
+          const image = new Image();
+          try {
+            await new Promise<void>((resolve, reject) => {
+              image.onload = () => resolve();
+              image.onerror = (errEvt) => {
+                console.error("Image load error for PDF (list-table):", errEvt);
+                reject(new Error("Image load error for PDF generation: Failed to load logo."));
+              };
+              image.src = currentLogoUrlConst; // currentLogoUrlConst is confirmed string here
+            });
+
+            const logoMaxHeight = 15;
+            const logoMaxWidth = 40;
+            let imgWidth = image.naturalWidth;
+            let imgHeight = image.naturalHeight;
+
+            if (imgWidth > logoMaxWidth) {
+              const ratio = logoMaxWidth / imgWidth;
+              imgWidth = logoMaxWidth;
+              imgHeight = imgHeight * ratio;
             }
-          });
-
-          const logoMaxHeight = 15;
-          const logoMaxWidth = 40;
-          let imgWidth = image.naturalWidth;
-          let imgHeight = image.naturalHeight;
-
-          if (imgWidth > logoMaxWidth) {
-            const ratio = logoMaxWidth / imgWidth;
-            imgWidth = logoMaxWidth;
-            imgHeight = imgHeight * ratio;
+            if (imgHeight > logoMaxHeight) {
+              const ratio = logoMaxHeight / imgHeight;
+              imgHeight = logoMaxHeight;
+              imgWidth = imgWidth * ratio;
+            }
+            
+            doc.addImage(currentLogoUrlConst, imgType, pageMargin, currentY, imgWidth, imgHeight);
+            currentY += imgHeight + 5;
+          } catch (imgLoadOrAddError) {
+            toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
+            console.error("Error processing logo for PDF (list-table):", imgLoadOrAddError);
           }
-          if (imgHeight > logoMaxHeight) {
-            const ratio = logoMaxHeight / imgHeight;
-            imgHeight = logoMaxHeight;
-            imgWidth = imgWidth * ratio;
-          }
-          
-          doc.addImage(currentLogoUrlConst, imgType, pageMargin, currentY, imgWidth, imgHeight);
-          currentY += imgHeight + 5;
-        } catch (imgLoadOrAddError) {
-           toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
-           console.error("Error processing logo for PDF (list-table):", imgLoadOrAddError);
+        } else {
+          console.warn("Invoice logoUrl is not a valid data URI or unsupported image type (list-table).");
+          toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
         }
-      } else {
-        console.warn("Invoice logoUrl is not a valid data URI or unsupported image type (list-table).");
-        toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
       }
     }
 
@@ -159,7 +157,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
         const rateDisplay = (invoice.taxInfo.rate * 100).toFixed(invoice.taxInfo.rate === 0.14975 ? 3 : (invoice.taxInfo.rate * 100 % 1 === 0 ? 0 : 1) );
         taxLabel = `Tax (${invoice.taxInfo.location} @ ${rateDisplay}%)`;
       }
-      doc.text(`${String(taxLabel || 'Tax')}:`, totalsX, currentY, { align: 'left'});
+      doc.text(`${String(taxLabel)}:`, totalsX, currentY, { align: 'left'});
       doc.text(`$${invoice.taxInfo.amount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
       currentY += 7;
     }
@@ -168,8 +166,8 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     doc.text("Total Paid:", totalsX, currentY, { align: 'left'});
     doc.text(`$${invoice.totalAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
 
-    doc.save(`Receipt-${invoice.receiptNumber || "unknown"}.pdf`);
-    toast({ title: "PDF Downloaded", description: `Invoice ${invoice.receiptNumber || ""} PDF has been generated.`});
+    doc.save(`Receipt-${String(invoice.receiptNumber || "unknown")}.pdf`);
+    toast({ title: "PDF Downloaded", description: `Invoice ${String(invoice.receiptNumber || "")} PDF has been generated.`});
   };
   
   if (!invoices || invoices.length === 0) {
@@ -220,7 +218,3 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     </Card>
   );
 }
-
-    
-
-    

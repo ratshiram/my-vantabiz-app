@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { PlusCircle, Trash2, Download, Save, Loader2, Info } from 'lucide-react';
-import type { InvoiceDocument, ServiceItem as ClientServiceItem, TaxInfo as ClientTaxInfo } from '@/lib/types';
+import type { InvoiceDocument, ServiceItem as ClientServiceItem, TaxInfo as ClientTaxInfo, InvoiceWriteData } from '@/lib/types';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
@@ -19,25 +19,6 @@ import { format } from 'date-fns';
 
 const canadianTaxRates: Record<string, number> = { AB: 0.05,BC: 0.12,MB: 0.12,NB: 0.15,NL: 0.15,NT: 0.05,NS: 0.15,NU: 0.05,ON: 0.13,PE: 0.15,QC: 0.14975,SK: 0.11,YT: 0.05 };
 const provinces = Object.keys(canadianTaxRates).map(p => ({ value: p, label: `${p} (${(canadianTaxRates[p]*100).toFixed(canadianTaxRates[p] === 0.14975 ? 3:0)}%)`}));
-
-// Type for data being written to Firestore, allowing Firestore Timestamps
-interface InvoiceWriteData {
-  id: string;
-  userId: string;
-  businessName: string;
-  businessAddress: string;
-  taxId?: string;
-  logoUrl?: string | null;
-  clientName: string;
-  clientAddress: string;
-  receiptNumber: string;
-  paymentDate: Timestamp; // Firestore Timestamp for writing
-  services: Array<{ description: string; amount: number }>;
-  subtotal: number;
-  taxInfo: ClientTaxInfo;
-  totalAmount: number;
-  createdAt: Timestamp; // Firestore Timestamp for writing
-}
 
 
 export function InvoiceGeneratorClient() {
@@ -248,10 +229,10 @@ export function InvoiceGeneratorClient() {
     }
     
     doc.setFontSize(18);
-    doc.text(String(businessName || ""), pageMargin, currentY);
+    doc.text(String(businessName), pageMargin, currentY);
     currentY += 7;
     doc.setFontSize(10);
-    doc.text(String(businessAddress || ""), pageMargin, currentY);
+    doc.text(String(businessAddress), pageMargin, currentY);
     currentY += 5;
     if (businessTaxId) {
       doc.text(`Tax ID: ${String(businessTaxId)}`, pageMargin, currentY);
@@ -271,7 +252,7 @@ export function InvoiceGeneratorClient() {
     doc.setFontSize(14).setFont(undefined, 'bold');
     doc.text("RECEIPT", receiptInfoX, receiptBlockY + 5, { align: 'right' });
     doc.setFontSize(10).setFont(undefined, 'normal');
-    doc.text(`#${String(receiptNumber || 'RCPT-XXXX')}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
+    doc.text(`#${String(receiptNumber)}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
     doc.text(`Date: ${String(formattedPaymentDate)}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
     currentY = Math.max(currentY, receiptBlockY + 25);
@@ -282,10 +263,10 @@ export function InvoiceGeneratorClient() {
     currentY += 4;
     doc.setFontSize(10).setTextColor(0);
     doc.setFont(undefined, 'bold');
-    doc.text(String(clientName || ""), pageMargin, currentY);
+    doc.text(String(clientName), pageMargin, currentY);
     currentY += 5;
     doc.setFont(undefined, 'normal');
-    doc.text(String(clientAddress || ""), pageMargin, currentY);
+    doc.text(String(clientAddress), pageMargin, currentY);
     currentY += 10;
 
     const tableColumn = ["Description", "Amount"];
@@ -320,7 +301,7 @@ export function InvoiceGeneratorClient() {
     currentY += 7;
 
     if (taxOption !== 'none' && taxAmount > 0) {
-      doc.text(`${String(taxLabel || 'Tax')}:`, totalsX, currentY, { align: 'left' });
+      doc.text(`${String(taxLabel)}:`, totalsX, currentY, { align: 'left' });
       doc.text(`$${taxAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
       currentY += 7;
     }
@@ -329,7 +310,7 @@ export function InvoiceGeneratorClient() {
     doc.text("Total Paid:", totalsX, currentY, { align: 'left'});
     doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
 
-    doc.save(`Receipt-${receiptNumber || 'xxxx'}.pdf`);
+    doc.save(`Receipt-${String(receiptNumber || 'xxxx')}.pdf`);
     toast({ title: "PDF Downloaded", description: "Invoice PDF has been generated."});
   };
 
@@ -343,7 +324,7 @@ export function InvoiceGeneratorClient() {
         return;
     }
     setIsSavingInvoice(true);
-    const { subtotal, taxAmount, totalAmount, taxInfoForDoc } = calculateTotals();
+    const { subtotal, taxInfoForDoc, totalAmount } = calculateTotals();
     const invoiceId = crypto.randomUUID();
     
     const localPaymentDate = new Date(paymentDate ? paymentDate + 'T00:00:00' : Date.now());
@@ -522,7 +503,3 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
-
-    
-
-    
