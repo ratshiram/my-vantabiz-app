@@ -64,7 +64,7 @@ export default function PricingPage() {
         title: "Stripe Configuration Error",
         description: "Stripe publishable key is missing. Payments are disabled. Please check environment variables.",
         variant: "destructive",
-        duration: Infinity, // Make it sticky
+        duration: Infinity, 
       });
       setIsStripeKeyMissing(true);
     } else {
@@ -116,15 +116,10 @@ export default function PricingPage() {
         throw new Error('Stripe.js failed to load. Please check your internet connection or ad-blockers.');
       }
 
-      // The error TS2345 below is because `redirectToCheckout` can throw for various reasons,
-      // including the cross-origin navigation issue if the redirect is blocked by the browser (e.g. in a sandboxed iframe).
-      // Such an error will be caught by the outer try-catch block.
+      
       const { error: stripeJsError } = await stripe.redirectToCheckout({ sessionId });
 
-      // This 'stripeJsError' is an error object returned by Stripe.js if it identifies an issue
-      // *before* attempting the actual redirection (e.g., invalid session ID).
-      // If the redirection itself fails due to browser policy (like in an iframe),
-      // `redirectToCheckout` might throw an exception that is caught by the outer `catch` block.
+      
       if (stripeJsError) {
         console.error("Stripe.js reported an error before redirect:", stripeJsError);
         toast({
@@ -167,8 +162,8 @@ export default function PricingPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
         {tiers.map((tier) => (
-          <Card key={tier.name} className={`flex flex-col shadow-xl ${tier.popular ? 'border-primary border-2 ring-4 ring-primary/20' : ''}`}>
-            {tier.popular && (
+          <Card key={tier.name} className={`flex flex-col shadow-xl ${('popular' in tier && tier.popular) ? 'border-primary border-2 ring-4 ring-primary/20' : ''}`}>
+            {('popular' in tier && tier.popular) && (
               <div className="py-1 px-4 bg-primary text-primary-foreground text-sm font-semibold rounded-t-lg -mb-px text-center">
                 Most Popular
               </div>
