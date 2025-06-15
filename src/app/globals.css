@@ -16,8 +16,8 @@
     --secondary-foreground: 195 85% 30%; /* Darker Cyan-Blue */
     --muted: 210 30% 95%; /* Very light cool grey */
     --muted-foreground: 210 15% 50%; /* Muted cool blue-grey */
-    --accent: 35 95% 55%; /* Vibrant Orange */
-    --accent-foreground: 0 0% 100%; /* White, for better contrast on orange */
+    --accent: 197 71% 73%; /* Sky Blue (#87CEEB) */
+    --accent-foreground: 240 10% 15%; /* Dark cool grey (for contrast on Sky Blue) */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 210 20% 90%; /* Light cool grey border */
@@ -52,8 +52,8 @@
     --secondary-foreground: 0 0% 95%; /* Light text on dark secondary */
     --muted: 240 5% 12%; /* Dark muted */
     --muted-foreground: 210 15% 70%; /* Lighter muted cool blue-grey */
-    --accent: 35 85% 60%; /* Vibrant Orange, slightly lighter for dark mode */
-    --accent-foreground: 240 5% 10%; /* Dark text on orange for dark mode */
+    --accent: 197 70% 65%; /* Adjusted Sky Blue for dark mode */
+    --accent-foreground: 0 0% 98%; /* Light text for dark mode accent */
     --destructive: 0 70% 50%; /* Slightly desaturated red for dark mode */
     --destructive-foreground: 0 0% 98%;
     --border: 240 5% 15%; /* Dark border */
