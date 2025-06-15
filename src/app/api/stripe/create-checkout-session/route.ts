@@ -5,26 +5,36 @@ import { auth as firebaseAuth } from '@/lib/firebase'; // For potential server-s
 
 // Initialize Stripe with your secret key and a specific API version
 // Make sure STRIPE_SECRET_KEY is set in your environment variables
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-04-10', // Use a fixed API version
-});
+
+// Moved initialization inside POST after checks
+// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+//   apiVersion: '2024-04-10', // Use a fixed API version
+// });
 
 export async function POST(req: NextRequest) {
   try {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const proPriceId = process.env.STRIPE_PRO_PRICE_ID;
+
+    if (!stripeSecretKey) {
+      console.error("STRIPE_SECRET_KEY is not set in environment variables.");
+      return NextResponse.json({ error: 'Stripe Secret Key is not configured.' }, { status: 500 });
+    }
+
+    if (!proPriceId) {
+      console.error("STRIPE_PRO_PRICE_ID is not set in environment variables.");
+      return NextResponse.json({ error: 'Stripe Pro Price ID is not configured.' }, { status: 500 });
+    }
+    
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2024-04-10', // Use a fixed API version
+    });
+
     const body = await req.json();
     const userId = body.userId; // User ID passed from the client
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required.' }, { status: 400 });
-    }
-
-    // You need to create a Product and Price in your Stripe Dashboard for "Pro Plan"
-    // and set its Price ID as an environment variable STRIPE_PRO_PRICE_ID
-    const proPriceId = process.env.STRIPE_PRO_PRICE_ID;
-
-    if (!proPriceId) {
-      console.error("STRIPE_PRO_PRICE_ID is not set in environment variables.");
-      return NextResponse.json({ error: 'Stripe Pro Price ID is not configured.' }, { status: 500 });
     }
     
     const origin = req.headers.get('origin') || 'http://localhost:9002'; // Fallback for local dev
@@ -58,3 +68,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Failed to create checkout session: ${errorMessage}` }, { status: 500 });
   }
 }
+
