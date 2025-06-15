@@ -52,7 +52,6 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     const totalExpenses = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const profitOrLoss = totalIncome - totalExpenses;
 
-    // Add Title
     doc.setFontSize(18);
     doc.text("Transaction Report", 14, 22);
     doc.setFontSize(10);
@@ -101,28 +100,29 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       }
     });
 
-    let tableEndY = 50; // Default Y position after table
-    // Type assertion for jsPDF augmented by autoTable
+    let tableEndY = 50; 
     const docWithAutoTable = doc as jsPDF & { lastAutoTable?: { finalY?: number } };
     if (docWithAutoTable.lastAutoTable && typeof docWithAutoTable.lastAutoTable.finalY === 'number') {
       tableEndY = docWithAutoTable.lastAutoTable.finalY;
     }
-    let finalY = tableEndY;
-
+    let finalY = tableEndY > 0 ? tableEndY : 50; // Ensure finalY is positive
 
     doc.setFontSize(12);
     doc.text("Summary:", 14, finalY + 10);
-    finalY += 10;
-
+    
     const summaryData = [
         ["Total Income:", `$${totalIncome.toFixed(2)}`],
         ["Total Expenses:", `$${totalExpenses.toFixed(2)}`],
         ["Profit / Loss:", `$${profitOrLoss.toFixed(2)}`]
     ];
+    
+    const summaryTableStartY = finalY + 15; // Adjusted startY for summary table
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const summaryTableMarginLeft = Math.max(14, pageWidth - 80); // Ensure margin is reasonable
 
     autoTable(doc, {
         body: summaryData,
-        startY: finalY + 5,
+        startY: summaryTableStartY,
         theme: 'plain',
         styles: { fontSize: 10, cellPadding: 2 },
         columnStyles: {
@@ -130,7 +130,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
             1: { halign: 'right' }
         },
         tableWidth: 'wrap',
-        margin: {left: doc.internal.pageSize.getWidth() - 70}
+        margin: {left: summaryTableMarginLeft } 
     });
     
     doc.save("Financial-Report.pdf");
@@ -245,4 +245,3 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     </Card>
   );
 }
-

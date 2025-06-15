@@ -37,7 +37,7 @@ export function InvoiceGeneratorClient() {
 
   const [serviceItems, setServiceItems] = useState<ClientServiceItem[]>([{ id: crypto.randomUUID(), description: '', amount: 0 }]);
   const [taxOption, setTaxOption] = useState('none');
-  const [provinceTax, setProvinceTax] = useState('NL'); // Default to NL for example
+  const [provinceTax, setProvinceTax] = useState('NL'); 
   const [paymentDate, setPaymentDate] = useState('');
   const [receiptNumber, setReceiptNumber] = useState('');
 
@@ -47,7 +47,7 @@ export function InvoiceGeneratorClient() {
   useEffect(() => {
     setIsClient(true);
     setPaymentDate(new Date().toISOString().split('T')[0]);
-    setReceiptNumber(`RCPT-${Date.now().toString().slice(-6)}`); // Shorter receipt number
+    setReceiptNumber(`RCPT-${Date.now().toString().slice(-6)}`); 
     if (serviceItems.length === 0) {
       addServiceItem();
     }
@@ -78,7 +78,7 @@ export function InvoiceGeneratorClient() {
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 1 * 1024 * 1024) { // 1MB limit for base64
+      if (file.size > 1 * 1024 * 1024) { 
         toast({ title: "Logo Too Large", description: "Please upload a logo smaller than 1MB.", variant: "destructive" });
         return;
       }
@@ -187,9 +187,19 @@ export function InvoiceGeneratorClient() {
         const imgTypeMatch = logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
             const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
+            
             const image = new Image();
-            image.src = logoUrl; // This is line 236
-            await new Promise<void>(resolve => { image.onload = () => resolve(); image.onerror = () => resolve();});
+            
+            // Wrap image loading in a promise to handle success/failure
+            await new Promise<void>((resolve, reject) => {
+              image.onload = () => resolve();
+              image.onerror = (err) => {
+                console.error("Image load error for PDF:", err);
+                toast({ title: "Logo Error", description: "Could not load logo image for PDF.", variant: "destructive" });
+                reject(new Error("Image load error"));
+              };
+              image.src = logoUrl; 
+            });
 
             const logoMaxHeight = 15; 
             const logoMaxWidth = 40;  
@@ -210,9 +220,11 @@ export function InvoiceGeneratorClient() {
             currentY += imgHeight + 5;
         } else {
             console.warn("Unsupported image type for PDF logo or invalid data URI.");
+            toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF.", variant: "default" });
         }
       } catch (e) {
-        console.error("Error adding logo to PDF", e);
+        console.error("Error processing logo for PDF", e);
+        // Toast is already shown in the promise reject
       }
     }
     
@@ -275,7 +287,6 @@ export function InvoiceGeneratorClient() {
     });
     
     let tableEndY = currentY;
-    // Type assertion for jsPDF augmented by autoTable
     const docWithAutoTable = doc as jsPDF & { lastAutoTable?: { finalY?: number } };
     if (docWithAutoTable.lastAutoTable && typeof docWithAutoTable.lastAutoTable.finalY === 'number') {
       tableEndY = docWithAutoTable.lastAutoTable.finalY;
@@ -315,7 +326,7 @@ export function InvoiceGeneratorClient() {
     const { subtotal, taxAmount, totalAmount, taxInfoForDoc } = calculateTotals();
     const invoiceId = crypto.randomUUID();
     
-    const localPaymentDate = new Date(paymentDate ? paymentDate + 'T00:00:00' : Date.now()); // Fallback to now if paymentDate is empty, though form validation should prevent this
+    const localPaymentDate = new Date(paymentDate ? paymentDate + 'T00:00:00' : Date.now()); 
     
     const invoiceBaseData = {
       id: invoiceId,
@@ -495,4 +506,3 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
-

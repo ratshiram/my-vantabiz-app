@@ -3,23 +3,19 @@
 
 import React from 'react';
 import { format } from "date-fns";
-import { Download, Eye } from "lucide-react"; // Eye icon can be for a future "view" functionality
+import { Download } from "lucide-react"; 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { InvoiceDocument } from "@/lib/types"; // Assuming types.ts is updated for InvoiceDocument
+import type { InvoiceDocument } from "@/lib/types"; 
 import { useToast } from '@/hooks/use-toast';
 
 interface InvoicesListTableProps {
   invoices: InvoiceDocument[];
 }
-
-// Based on Canadian tax rates in InvoiceGeneratorClient
-const canadianTaxRatesForDisplay: Record<string, number> = { AB: 0.05,BC: 0.12,MB: 0.12,NB: 0.15,NL: 0.15,NT: 0.05,NS: 0.15,NU: 0.05,ON: 0.13,PE: 0.15,QC: 0.14975,SK: 0.11,YT: 0.05 };
-
 
 export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
   const { toast } = useToast();
@@ -35,7 +31,6 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = pageMargin;
 
-    // Logo
     if (invoice.logoUrl) {
       try {
         const imgTypeMatch = invoice.logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
@@ -43,9 +38,16 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
             const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
             
             const image = new Image();
-            image.src = invoice.logoUrl; // This is line 102
-            
-            await new Promise<void>(resolve => { image.onload = () => resolve(); image.onerror = () => resolve();});
+             // Wrap image loading in a promise to handle success/failure
+            await new Promise<void>((resolve, reject) => {
+              image.onload = () => resolve();
+              image.onerror = (err) => {
+                console.error("Image load error for PDF:", err);
+                toast({ title: "Logo Error", description: "Could not load logo image for PDF.", variant: "destructive" });
+                reject(new Error("Image load error"));
+              };
+              image.src = invoice.logoUrl; // This is line 96
+            });
 
             const logoMaxHeight = 15;
             const logoMaxWidth = 40;
@@ -67,15 +69,15 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
             currentY += imgHeight + 5; 
         } else {
             console.warn("Invoice logoUrl is not a valid data URI or unsupported image type.");
+            toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF.", variant: "default" });
         }
       } catch (e) {
-        console.error("Error adding logo to PDF from saved invoice:", e);
-        toast({ title: "Logo Error", description: "Could not add logo to PDF.", variant: "destructive" });
+        console.error("Error processing logo for PDF from saved invoice:", e);
+        // Toast might have already been shown by the promise reject
       }
     }
 
 
-    // Business Details
     doc.setFontSize(18);
     doc.text(invoice.businessName, pageMargin, currentY);
     currentY += 7;
@@ -87,7 +89,6 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
       currentY += 5;
     }
 
-    // Receipt Info (aligned to right)
     const receiptInfoX = pageWidth - pageMargin;
     let receiptBlockY = pageMargin; 
     if (invoice.logoUrl) receiptBlockY = pageMargin; 
@@ -101,7 +102,6 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     
     currentY = Math.max(currentY, receiptBlockY + 25); 
 
-    // Client Details
     currentY += 10;
     doc.setFontSize(8).setTextColor(100);
     doc.text("BILL TO", pageMargin, currentY);
@@ -114,7 +114,6 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     doc.text(invoice.clientAddress, pageMargin, currentY);
     currentY += 10;
 
-    // Services Table
     const tableColumn = ["Description", "Amount"];
     const tableRows = invoice.services.map(service => [
       service.description,
@@ -137,7 +136,6 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     });
     
     let tableEndY = currentY;
-    // Type assertion for jsPDF augmented by autoTable
     const docWithAutoTable = doc as jsPDF & { lastAutoTable?: { finalY?: number } };
     if (docWithAutoTable.lastAutoTable && typeof docWithAutoTable.lastAutoTable.finalY === 'number') {
       tableEndY = docWithAutoTable.lastAutoTable.finalY;
@@ -145,7 +143,6 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     currentY = tableEndY + 10;
 
 
-    // Totals
     const totalsX = pageWidth - pageMargin - 70; 
     doc.setFontSize(10);
     doc.text("Subtotal:", totalsX, currentY, { align: 'left' });
@@ -167,13 +164,12 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     doc.text("Total Paid:", totalsX, currentY, { align: 'left'});
     doc.text(`$${invoice.totalAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
 
-    // Save PDF
     doc.save(`Receipt-${invoice.receiptNumber}.pdf`);
     toast({ title: "PDF Downloaded", description: `Invoice ${invoice.receiptNumber} PDF has been generated.`});
   };
   
   if (!invoices || invoices.length === 0) {
-    return null; // Page level handles "No invoices" message
+    return null; 
   }
 
   return (
@@ -220,4 +216,3 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     </Card>
   );
 }
-

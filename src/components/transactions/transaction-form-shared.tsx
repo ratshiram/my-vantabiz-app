@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react'; // Added useState
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -38,17 +38,24 @@ export const expenseCategories = [
 interface TransactionFormProps {
   type: "income" | "expense";
   onSubmit: (values: TransactionFormValues) => void;
-  defaultDate?: Date;
+  defaultDate?: Date; 
 }
 
 export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDate }: TransactionFormProps) {
   const { toast } = useToast();
+  const [isClientSide, setIsClientSide] = useState(false);
   
-  const [clientDefaultDate, setClientDefaultDate] = React.useState<Date | undefined>(propDefaultDate);
+  // Initialize with propDefaultDate if available, otherwise undefined.
+  // Date will be set to new Date() client-side if propDefaultDate is not provided.
+  const initialDate = propDefaultDate;
 
   useEffect(() => {
-    setClientDefaultDate(new Date());
-  }, []); 
+    setIsClientSide(true);
+    if (!propDefaultDate) {
+      // If no defaultDate prop, set it to current date only on client
+      form.setValue('date', new Date(), { shouldValidate: true });
+    }
+  }, [propDefaultDate]); 
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -56,21 +63,10 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
       description: "",
       amount: undefined, 
       category: "",
-      date: undefined, 
+      date: initialDate, // Use initialDate which could be undefined until client-side effect runs
     },
   });
   
-  useEffect(() => {
-    if (clientDefaultDate) {
-      form.reset({
-        description: "",
-        amount: undefined,
-        category: "",
-        date: clientDefaultDate,
-      });
-    }
-  }, [clientDefaultDate, form.reset]);
-
   const categories = type === "income" ? incomeCategories : expenseCategories;
 
   const handleSubmit = (values: TransactionFormValues) => {
@@ -80,14 +76,13 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
       description: `${values.description} - $${Number(values.amount).toFixed(2)}`,
       variant: "default",
     });
-    if (clientDefaultDate) { 
-       form.reset({
-        description: "",
-        amount: undefined, 
-        category: "",
-        date: clientDefaultDate,
-      });
-    }
+    // Reset form, ensuring date is reset to current date on client
+    form.reset({
+      description: "",
+      amount: undefined, 
+      category: "",
+      date: new Date(), // Reset to current date
+    });
   };
 
   return (
@@ -121,6 +116,7 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
                         "w-full pl-3 text-left font-normal",
                         !field.value && "text-muted-foreground"
                       )}
+                      disabled={!isClientSide} // Disable if not client side yet to prevent hydration mismatch if date is undefined server-side
                     >
                       {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -203,7 +199,7 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
             type === 'income' ? 'bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-400' : 'bg-red-500 hover:bg-red-600 focus:ring-red-400',
             'text-white'
           )}
-          disabled={form.formState.isSubmitting || !clientDefaultDate}
+          disabled={form.formState.isSubmitting || !isClientSide || !form.watch('date')} // Also disable if date is not set
         >
           {form.formState.isSubmitting ? "Adding..." : `Add ${type.charAt(0).toUpperCase() + type.slice(1)}`}
         </Button>
