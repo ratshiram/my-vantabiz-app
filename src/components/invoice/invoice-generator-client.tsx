@@ -1,14 +1,14 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusCircle, Trash2, Download, Save, Loader2 } from 'lucide-react';
-import type { InvoiceDocument, ServiceItem as ClientServiceItem, TaxInfo as ClientTaxInfo } from '@/lib/types'; // Adjusted types
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { PlusCircle, Trash2, Download, Save, Loader2, Info } from 'lucide-react';
+import type { InvoiceDocument, ServiceItem as ClientServiceItem, TaxInfo as ClientTaxInfo } from '@/lib/types';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
@@ -22,14 +22,15 @@ const provinces = Object.keys(canadianTaxRates).map(p => ({ value: p, label: `${
 
 export function InvoiceGeneratorClient() {
   const { toast } = useToast();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, updateUserBusinessDetails } = useAuth();
   const [isClient, setIsClient] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingInvoice, setIsSavingInvoice] = useState(false);
+  const [isSavingBusinessInfo, setIsSavingBusinessInfo] = useState(false);
   
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessTaxId, setBusinessTaxId] = useState('');
-  const [logoUrl, setLogoUrl] = useState<string | null>(null); // Base64 string for logo
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   const [clientName, setClientName] = useState('');
   const [clientAddress, setClientAddress] = useState('');
@@ -51,6 +52,17 @@ export function InvoiceGeneratorClient() {
       addServiceItem();
     }
   }, []);
+
+  // Pre-fill business info from user profile
+  useEffect(() => {
+    if (user && isClient) {
+      setBusinessName(user.businessName || '');
+      setBusinessAddress(user.businessAddress || '');
+      setBusinessTaxId(user.businessTaxId || '');
+      setLogoUrl(user.logoUrl || null);
+    }
+  }, [user, isClient]);
+
 
   const addServiceItem = () => {
     setServiceItems([...serviceItems, { id: crypto.randomUUID(), description: '', amount: 0 }]);
@@ -95,6 +107,11 @@ export function InvoiceGeneratorClient() {
   };
 
   const generatePreview = () => {
+    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0) || !paymentDate || !receiptNumber) {
+        toast({ title: "Missing Information", description: "Please fill out all required fields (Business Name, Client Name, Payment Date, Receipt Number, and at least one valid service item) before generating a preview.", variant: "destructive"});
+        setCanDownload(false);
+        return;
+    }
     const { subtotal, taxAmount, totalAmount, taxLabel } = calculateTotals();
     const formattedDate = paymentDate ? new Date(paymentDate + 'T00:00:00Z').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
     
@@ -147,7 +164,7 @@ export function InvoiceGeneratorClient() {
 
   const handleDownloadPdf = () => {
     if (!canDownload || typeof window === 'undefined') return;
-    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0)) {
+    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0) || !paymentDate || !receiptNumber) {
         toast({ title: "Incomplete Form", description: "Please fill all required fields and add at least one valid service item.", variant: "destructive"});
         return;
     }
@@ -159,25 +176,23 @@ export function InvoiceGeneratorClient() {
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = pageMargin;
 
-    // Logo
     if (logoUrl) {
       try {
         const img = new Image();
         img.src = logoUrl;
-        // Check image type for jspdf
-        const imgType = logoUrl.substring(logoUrl.indexOf('/') + 1, logoUrl.indexOf(';'));
-        if (imgType === 'png' || imgType === 'jpeg' || imgType === 'jpg') {
-            doc.addImage(logoUrl, imgType.toUpperCase(), pageMargin, currentY, 30, 15); // Adjust width/height as needed
-            currentY += 20; // Space after logo
+        const imgTypeMatch = logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
+        if (imgTypeMatch && imgTypeMatch[1]) {
+            const imgType = imgTypeMatch[1].toUpperCase();
+            doc.addImage(logoUrl, imgType, pageMargin, currentY, 30, 15); 
+            currentY += 20; 
         } else {
-            console.warn("Unsupported image type for PDF logo:", imgType);
+            console.warn("Unsupported image type for PDF logo or invalid data URI.");
         }
       } catch (e) {
         console.error("Error adding logo to PDF", e);
       }
     }
     
-    // Header Section (Business Info & Receipt Info)
     doc.setFontSize(18);
     doc.text(businessName || "Your Business Name", pageMargin, currentY);
     currentY += 7;
@@ -196,9 +211,8 @@ export function InvoiceGeneratorClient() {
     doc.text(`#${receiptNumber || 'RCPT-XXXX'}`, receiptInfoX, pageMargin + 12, { align: 'right' });
     doc.text(`Date: ${formattedPaymentDate}`, receiptInfoX, pageMargin + 17, { align: 'right' });
     
-    currentY = Math.max(currentY, pageMargin + 25); // Ensure currentY is below header
+    currentY = Math.max(currentY, pageMargin + 25); 
 
-    // Bill To Section
     currentY += 10;
     doc.setFontSize(8).setTextColor(100);
     doc.text("BILL TO", pageMargin, currentY);
@@ -211,7 +225,6 @@ export function InvoiceGeneratorClient() {
     doc.text(clientAddress || "Client Address", pageMargin, currentY);
     currentY += 10;
 
-    // Services Table
     const tableColumn = ["Description", "Amount"];
     const tableRows = serviceItems.map(item => [
       item.description,
@@ -223,7 +236,7 @@ export function InvoiceGeneratorClient() {
       body: tableRows,
       startY: currentY,
       theme: 'striped',
-      headStyles: { fillColor: [70, 128, 144] }, // Slate Blue
+      headStyles: { fillColor: [70, 128, 144] }, 
       columnStyles: {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
@@ -234,9 +247,7 @@ export function InvoiceGeneratorClient() {
     });
     currentY = (doc as any).lastAutoTable.finalY + 10;
 
-
-    // Totals Section
-    const totalsX = pageWidth - pageMargin - 50; // Align totals to the right
+    const totalsX = pageWidth - pageMargin - 60; 
     doc.setFontSize(10);
     doc.text("Subtotal:", totalsX, currentY, { align: 'left' });
     doc.text(`$${subtotal.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
@@ -261,11 +272,11 @@ export function InvoiceGeneratorClient() {
       toast({ title: "Not Logged In", description: "Please log in to save invoices.", variant: "destructive" });
       return;
     }
-    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0)) {
+    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0) || !paymentDate || !receiptNumber) {
         toast({ title: "Incomplete Form", description: "Please fill all required fields and add at least one valid service item.", variant: "destructive"});
         return;
     }
-    setIsSaving(true);
+    setIsSavingInvoice(true);
     const { subtotal, taxAmount, totalAmount, taxInfoForDoc } = calculateTotals();
     const invoiceId = crypto.randomUUID();
     
@@ -274,12 +285,12 @@ export function InvoiceGeneratorClient() {
       userId: user.id,
       businessName,
       businessAddress,
-      taxId: businessTaxId || undefined, // Ensure optional fields are undefined if empty
+      taxId: businessTaxId || undefined,
       logoUrl: logoUrl || undefined,
       clientName,
       clientAddress,
       receiptNumber,
-      paymentDate: Timestamp.fromDate(new Date(paymentDate + 'T00:00:00Z')), // Store as Firestore Timestamp in UTC
+      paymentDate: Timestamp.fromDate(new Date(paymentDate + 'T00:00:00Z')),
       services: serviceItems.map(s => ({ description: s.description, amount: s.amount })),
       subtotal,
       taxInfo: taxInfoForDoc,
@@ -294,7 +305,29 @@ export function InvoiceGeneratorClient() {
       console.error("Error saving invoice:", error);
       toast({ title: "Save Failed", description: "Could not save the invoice. Please try again.", variant: "destructive" });
     } finally {
-      setIsSaving(false);
+      setIsSavingInvoice(false);
+    }
+  };
+
+  const handleSaveBusinessInfo = async () => {
+    if (!user || !updateUserBusinessDetails) {
+      toast({ title: "Error", description: "Could not save business info. User not available.", variant: "destructive" });
+      return;
+    }
+    setIsSavingBusinessInfo(true);
+    try {
+      await updateUserBusinessDetails({
+        businessName,
+        businessAddress,
+        businessTaxId,
+        logoUrl,
+      });
+      // Toast is handled within updateUserBusinessDetails
+    } catch (error) {
+      // Error toast is handled within updateUserBusinessDetails
+      console.error("Failed to save business info from client:", error);
+    } finally {
+      setIsSavingBusinessInfo(false);
     }
   };
   
@@ -317,12 +350,26 @@ export function InvoiceGeneratorClient() {
         <CardContent className="p-6">
           <form onSubmit={(e) => { e.preventDefault(); generatePreview(); }} className="space-y-6">
             <div>
-              <h3 className="text-xl font-semibold text-foreground border-b pb-2 mb-4">1. Your Information</h3>
+              <div className="flex justify-between items-center border-b pb-2 mb-4">
+                <h3 className="text-xl font-semibold text-foreground">1. Your Information</h3>
+                <Button 
+                  type="button" 
+                  onClick={handleSaveBusinessInfo} 
+                  variant="outline" 
+                  size="sm"
+                  disabled={isSavingBusinessInfo}
+                  title="Save your business details for next time"
+                >
+                  {isSavingBusinessInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {isSavingBusinessInfo ? "Saving..." : "Save My Info"}
+                </Button>
+              </div>
               <div className="space-y-4">
                 <div><Label htmlFor="business-name">Business Name</Label><Input id="business-name" value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="Your Business Name" required /></div>
                 <div><Label htmlFor="business-address">Business Address</Label><Input id="business-address" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} placeholder="Your Business Address" required /></div>
                 <div><Label htmlFor="business-tax-id">Tax ID (Optional)</Label><Input id="business-tax-id" value={businessTaxId} onChange={e => setBusinessTaxId(e.target.value)} placeholder="e.g., HST Number" /></div>
                 <div><Label htmlFor="logo-upload">Logo (Optional, max 1MB, PNG/JPEG)</Label><Input id="logo-upload" type="file" accept="image/png, image/jpeg" onChange={handleLogoUpload} className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"/></div>
+                {logoUrl && <div className="mt-2"><Label>Current Logo:</Label><img src={logoUrl} alt="Current business logo" className="mt-1 border rounded-md max-h-20 object-contain"/></div>}
               </div>
             </div>
 
@@ -388,18 +435,15 @@ export function InvoiceGeneratorClient() {
           </CardContent>
         </Card>
         <div className="flex justify-center items-center gap-4 mt-4">
-          <Button onClick={handleSaveInvoice} disabled={!canDownload || isSaving || !user} className="bg-green-600 hover:bg-green-700 text-white">
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {isSaving ? "Saving..." : "Save Invoice"}
+          <Button onClick={handleSaveInvoice} disabled={!canDownload || isSavingInvoice || !user} className="bg-green-600 hover:bg-green-700 text-white">
+            {isSavingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {isSavingInvoice ? "Saving..." : "Save Invoice"}
           </Button>
           <Button onClick={handleDownloadPdf} disabled={!canDownload} className="bg-accent hover:bg-accent/90 text-accent-foreground">
             <Download className="mr-2 h-4 w-4" /> Download PDF
           </Button>
         </div>
       </div>
-      {/* Removed the hidden div for html2pdf, as it's no longer used */}
     </div>
   );
 }
-
-    

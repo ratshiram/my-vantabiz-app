@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { createContext, useState, useEffect, useCallback } from 'react';
-import type { User, LoginFormValues, SignupFormValues } from '@/lib/types';
+import type { User, LoginFormValues, SignupFormValues, AuthProviderProps, UserBusinessDetails } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { 
   getAuth, 
@@ -19,6 +19,7 @@ import {
   doc, 
   setDoc, 
   getDoc,
+  updateDoc, // Added updateDoc
   Timestamp
 } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
@@ -30,6 +31,7 @@ interface AuthContextType {
   login: (values: LoginFormValues) => Promise<void>;
   signup: (values: SignupFormValues) => Promise<void>;
   logout: () => void;
+  updateUserBusinessDetails: (details: UserBusinessDetails) => Promise<void>; // New function
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,23 +67,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
             username: userData.username || "", 
             tier: userData.tier || 'free',
             trialEndDate: trialEndDate,
+            businessName: userData.businessName,
+            businessAddress: userData.businessAddress,
+            businessTaxId: userData.businessTaxId,
+            logoUrl: userData.logoUrl,
           });
         } else {
-           // This case might happen if user exists in Auth but not in Firestore (e.g., Firestore doc creation failed)
-           // Or for newly created users before Firestore doc is set.
-           // We can create a default user object here or handle it based on app logic.
-           // For now, creating a basic user object with default trial.
            const defaultTrialEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-           setUser({
+           const newUser: User = {
             id: firebaseUser.uid,
             email: firebaseUser.email || "",
-            name: firebaseUser.displayName || "User", // Or prompt user to set name
-            username: "", // Or prompt user to set username
+            name: firebaseUser.displayName || "User",
+            username: "", 
             tier: 'free', 
-            trialEndDate: defaultTrialEndDate, 
-          });
-           // Optionally, create the Firestore document if it's missing and should exist
-           // await setDoc(userDocRef, { email: firebaseUser.email, name: "User", username: "", tier: 'free', trialEndDate: Timestamp.fromDate(defaultTrialEndDate) }, { merge: true });
+            trialEndDate: defaultTrialEndDate,
+            businessName: "",
+            businessAddress: "",
+            businessTaxId: "",
+            logoUrl: null,
+          };
+           setUser(newUser);
+           await setDoc(userDocRef, { 
+             email: newUser.email, 
+             name: newUser.name, 
+             username: newUser.username, 
+             tier: newUser.tier, 
+             trialEndDate: Timestamp.fromDate(defaultTrialEndDate),
+             createdAt: Timestamp.now(),
+             businessName: "",
+             businessAddress: "",
+             businessTaxId: "",
+             logoUrl: null,
+            }, { merge: true });
         }
       } else {
         setUser(null);
@@ -97,7 +114,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       router.push('/'); 
-      // Toast for success is handled by the form if needed, or can be added here
     } catch (error) {
       setIsLoading(false);
       let errorCode = "Unknown error";
@@ -106,7 +122,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (error instanceof Error && (error as AuthError).code) {
         const firebaseError = error as AuthError;
         errorCode = firebaseError.code;
-        errorMessage = firebaseError.message;
+        errorMessage = `Firebase: ${firebaseError.message} (code: ${firebaseError.code})`;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
@@ -114,9 +130,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error("Login Failed:", errorCode, errorMessage, error); 
       toast({
         title: "Login Failed",
-        description: `Error: ${errorCode}. ${errorMessage}`,
+        description: errorMessage,
         variant: "destructive",
       });
+      throw error;
     }
   }, [router, toast]);
 
@@ -134,11 +151,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         email: values.email,
         tier: 'free',
         trialEndDate: Timestamp.fromDate(trialEndDate),
-        createdAt: Timestamp.now(), // Good practice to add creation timestamp
+        createdAt: Timestamp.now(),
+        businessName: "", // Initialize business fields
+        businessAddress: "",
+        businessTaxId: "",
+        logoUrl: null,
       });
       
       router.push('/');
-      // Toast for success is handled by the form if needed, or can be added here
     } catch (error) {
       setIsLoading(false);
       let errorCode = "Unknown error";
@@ -147,7 +167,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (error instanceof Error && (error as AuthError).code) {
         const firebaseError = error as AuthError;
         errorCode = firebaseError.code;
-        errorMessage = firebaseError.message;
+        errorMessage = `Firebase: ${firebaseError.message} (code: ${firebaseError.code})`;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
@@ -155,9 +175,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error("Signup Failed:", errorCode, errorMessage, error); 
       toast({
         title: "Signup Failed",
-        description: `Error: ${errorCode}. ${errorMessage}`,
+        description: errorMessage,
         variant: "destructive",
       });
+      throw error;
     }
   }, [router, toast]);
 
@@ -174,14 +195,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
             variant: "destructive"
         });
     } finally {
-        setIsLoading(false); // Explicitly set loading to false
+        setUser(null); // Clear user state on logout
+        setIsLoading(false); 
     }
   }, [router, toast]);
 
+  const updateUserBusinessDetails = useCallback(async (details: UserBusinessDetails) => {
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to update business details.", variant: "destructive" });
+      throw new Error("User not authenticated");
+    }
+    setIsLoading(true);
+    try {
+      const userDocRef = doc(db, "users", user.id);
+      // Ensure undefined fields are handled correctly for Firestore (it removes fields if value is undefined)
+      // To clear a field, you might need to explicitly set it to null or an empty string.
+      const detailsToUpdate: Partial<UserBusinessDetails> = {
+        businessName: details.businessName ?? "", // Store empty string if undefined
+        businessAddress: details.businessAddress ?? "",
+        businessTaxId: details.businessTaxId ?? "",
+        logoUrl: details.logoUrl === undefined ? null : details.logoUrl, // Store null if undefined
+      };
+
+      await updateDoc(userDocRef, detailsToUpdate);
+      setUser(prevUser => prevUser ? { ...prevUser, ...detailsToUpdate } : null);
+      toast({ title: "Success", description: "Business details updated successfully." });
+    } catch (error) {
+      console.error("Failed to update business details:", error);
+      toast({ title: "Error", description: "Failed to update business details.", variant: "destructive" });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, toast]);
+
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, signup, logout, updateUserBusinessDetails }}>
       {children}
     </AuthContext.Provider>
   );
 }
-

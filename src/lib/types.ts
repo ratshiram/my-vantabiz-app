@@ -1,5 +1,6 @@
 
 import { z } from 'zod';
+import type { Timestamp } from 'firebase/firestore';
 
 // FinTrack Lite Types
 export interface Transaction {
@@ -100,13 +101,21 @@ export type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 // Auth and User Types
 export type UserTier = 'free' | 'pro';
 
-export interface User {
+export interface UserBusinessDetails {
+  businessName?: string;
+  businessAddress?: string;
+  businessTaxId?: string;
+  logoUrl?: string | null;
+}
+
+export interface User extends UserBusinessDetails {
   id: string;
   email: string;
   name?: string;
-  username?: string; // Added username
+  username?: string;
   tier: UserTier;
   trialEndDate?: Date | null;
+  // Fields from UserBusinessDetails are inherited
 }
 
 export const loginSchema = z.object({
@@ -127,3 +136,7 @@ export const signupSchema = z.object({
 });
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
+// Props for AuthProvider
+export interface AuthProviderProps {
+  children: React.ReactNode;
+}
