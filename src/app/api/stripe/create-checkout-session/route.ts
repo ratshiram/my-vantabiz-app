@@ -1,10 +1,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import Stripe from 'stripe';
-import { auth as firebaseAuth } from '@/lib/firebase'; // For potential server-side auth check if needed later
-
-// Initialize Stripe with your secret key and a specific API version
-// Make sure STRIPE_SECRET_KEY is set in your environment variables
+// import { auth as firebaseAuth } from '@/lib/firebase'; // For potential server-side auth check if needed later
 
 // Moved initialization inside POST after checks
 // const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -30,7 +27,7 @@ export async function POST(req: NextRequest) {
       apiVersion: '2024-04-10', // Use a fixed API version
     });
 
-    const body = await req.json();
+    const body: { userId?: string } = await req.json();
     const userId = body.userId; // User ID passed from the client
 
     if (!userId) {

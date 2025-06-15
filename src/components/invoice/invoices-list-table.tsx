@@ -38,20 +38,14 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     // Logo
     if (invoice.logoUrl) {
       try {
-        // Check if it's a valid data URI for an image
         const imgTypeMatch = invoice.logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
             const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
             
-            // To get image dimensions for scaling, we need to load it first.
-            // This is an async operation. For simplicity, we can use fixed max dimensions.
-            // A more robust solution would involve preloading or handling this async properly.
             const image = new Image();
-            image.src = invoice.logoUrl;
+            image.src = invoice.logoUrl; // This is line 102
             
-            // Wait for image to load to get its dimensions - this is a simplified approach
-            // In a real app, manage this promise carefully.
-            await new Promise(resolve => { image.onload = resolve; image.onerror = resolve; });
+            await new Promise<void>(resolve => { image.onload = () => resolve(); image.onerror = () => resolve();});
 
             const logoMaxHeight = 15;
             const logoMaxWidth = 40;
@@ -95,17 +89,17 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
 
     // Receipt Info (aligned to right)
     const receiptInfoX = pageWidth - pageMargin;
-    let receiptBlockY = pageMargin; // Start high
-    if (invoice.logoUrl) receiptBlockY = pageMargin; // Keep receipt info aligned to top right 
-    else receiptBlockY = Math.max(pageMargin, currentY - (invoice.taxId ? 17 : 12) ); // Align with business name if no logo
+    let receiptBlockY = pageMargin; 
+    if (invoice.logoUrl) receiptBlockY = pageMargin; 
+    else receiptBlockY = Math.max(pageMargin, currentY - (invoice.taxId ? 17 : 12) ); 
 
     doc.setFontSize(14).setFont(undefined, 'bold');
     doc.text("RECEIPT", receiptInfoX, receiptBlockY + 5, { align: 'right' });
     doc.setFontSize(10).setFont(undefined, 'normal');
     doc.text(`#${invoice.receiptNumber}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
-    doc.text(`Date: ${format(new Date(invoice.paymentDate), "MMMM d, yyyy")}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
+    doc.text(`Date: ${format(invoice.paymentDate, "MMMM d, yyyy")}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
-    currentY = Math.max(currentY, receiptBlockY + 25); // Ensure currentY is below header and receipt info
+    currentY = Math.max(currentY, receiptBlockY + 25); 
 
     // Client Details
     currentY += 10;
@@ -132,7 +126,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
       body: tableRows,
       startY: currentY,
       theme: 'striped',
-      headStyles: { fillColor: [70, 128, 144] }, // Slate blue like, from theme
+      headStyles: { fillColor: [70, 128, 144] }, 
       columnStyles: {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
@@ -141,10 +135,18 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
         currentY = data.cursor?.y || currentY;
       }
     });
-    currentY = (doc as any).lastAutoTable.finalY + 10;
+    
+    let tableEndY = currentY;
+    // Type assertion for jsPDF augmented by autoTable
+    const docWithAutoTable = doc as jsPDF & { lastAutoTable?: { finalY?: number } };
+    if (docWithAutoTable.lastAutoTable && typeof docWithAutoTable.lastAutoTable.finalY === 'number') {
+      tableEndY = docWithAutoTable.lastAutoTable.finalY;
+    }
+    currentY = tableEndY + 10;
+
 
     // Totals
-    const totalsX = pageWidth - pageMargin - 70; // Adjusted for potentially longer labels
+    const totalsX = pageWidth - pageMargin - 70; 
     doc.setFontSize(10);
     doc.text("Subtotal:", totalsX, currentY, { align: 'left' });
     doc.text(`$${invoice.subtotal.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
@@ -196,7 +198,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
                 <TableRow key={invoice.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell>{invoice.receiptNumber}</TableCell>
                   <TableCell>{invoice.clientName}</TableCell>
-                  <TableCell>{format(new Date(invoice.paymentDate), "MMM d, yyyy")}</TableCell>
+                  <TableCell>{format(invoice.paymentDate, "MMM d, yyyy")}</TableCell>
                   <TableCell className="text-right font-medium">${invoice.totalAmount.toFixed(2)}</TableCell>
                   <TableCell className="text-center">
                     <Button 
@@ -218,3 +220,4 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     </Card>
   );
 }
+

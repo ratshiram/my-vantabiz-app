@@ -87,7 +87,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 42, // Adjusted Y position
+      startY: 42, 
       theme: 'striped',
       headStyles: { fillColor: [22, 160, 133] },
       alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -101,7 +101,14 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       }
     });
 
-    let finalY = (doc as any).lastAutoTable.finalY || 50;
+    let tableEndY = 50; // Default Y position after table
+    // Type assertion for jsPDF augmented by autoTable
+    const docWithAutoTable = doc as jsPDF & { lastAutoTable?: { finalY?: number } };
+    if (docWithAutoTable.lastAutoTable && typeof docWithAutoTable.lastAutoTable.finalY === 'number') {
+      tableEndY = docWithAutoTable.lastAutoTable.finalY;
+    }
+    let finalY = tableEndY;
+
 
     doc.setFontSize(12);
     doc.text("Summary:", 14, finalY + 10);

@@ -188,8 +188,8 @@ export function InvoiceGeneratorClient() {
         if (imgTypeMatch && imgTypeMatch[1]) {
             const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
             const image = new Image();
-            image.src = logoUrl;
-            await new Promise(resolve => { image.onload = resolve; image.onerror = resolve;});
+            image.src = logoUrl; // This is line 236
+            await new Promise<void>(resolve => { image.onload = () => resolve(); image.onerror = () => resolve();});
 
             const logoMaxHeight = 15; 
             const logoMaxWidth = 40;  
@@ -273,7 +273,14 @@ export function InvoiceGeneratorClient() {
         currentY = data.cursor?.y || currentY;
       }
     });
-    currentY = (doc as any).lastAutoTable.finalY + 10; 
+    
+    let tableEndY = currentY;
+    // Type assertion for jsPDF augmented by autoTable
+    const docWithAutoTable = doc as jsPDF & { lastAutoTable?: { finalY?: number } };
+    if (docWithAutoTable.lastAutoTable && typeof docWithAutoTable.lastAutoTable.finalY === 'number') {
+      tableEndY = docWithAutoTable.lastAutoTable.finalY;
+    }
+    currentY = tableEndY + 10;
 
     const totalsX = pageWidth - pageMargin - 70; 
     doc.setFontSize(10);
@@ -308,7 +315,7 @@ export function InvoiceGeneratorClient() {
     const { subtotal, taxAmount, totalAmount, taxInfoForDoc } = calculateTotals();
     const invoiceId = crypto.randomUUID();
     
-    const localPaymentDate = new Date(paymentDate + 'T00:00:00');
+    const localPaymentDate = new Date(paymentDate ? paymentDate + 'T00:00:00' : Date.now()); // Fallback to now if paymentDate is empty, though form validation should prevent this
     
     const invoiceBaseData = {
       id: invoiceId,
@@ -324,10 +331,9 @@ export function InvoiceGeneratorClient() {
       taxInfo: taxInfoForDoc,
       totalAmount,
       createdAt: Timestamp.now(),
-      logoUrl: (logoUrl && logoUrl.trim()) ? logoUrl : null, // Ensure logoUrl is null if empty
+      logoUrl: (logoUrl && logoUrl.trim()) ? logoUrl : null, 
     };
 
-    // Conditionally add taxId if it's a non-empty string
     const invoiceToSave: InvoiceDocument = {
         ...invoiceBaseData,
         ...(businessTaxId && businessTaxId.trim() && { taxId: businessTaxId.trim() }),

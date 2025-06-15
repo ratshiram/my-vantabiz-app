@@ -47,31 +47,29 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
   const [clientDefaultDate, setClientDefaultDate] = React.useState<Date | undefined>(propDefaultDate);
 
   useEffect(() => {
-    // Set clientDefaultDate only on the client, after mount
     setClientDefaultDate(new Date());
-  }, []); // Empty dependency array ensures this runs once on mount client-side
+  }, []); 
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       description: "",
-      amount: '' as unknown as number, // Initialize with empty string for controlled input
+      amount: undefined, 
       category: "",
       date: undefined, 
     },
   });
   
-  // This useEffect resets the form when clientDefaultDate is set (which happens once on mount)
   useEffect(() => {
     if (clientDefaultDate) {
       form.reset({
         description: "",
-        amount: '', // Reset with empty string
+        amount: undefined,
         category: "",
         date: clientDefaultDate,
       });
     }
-  }, [clientDefaultDate, form.reset]); // Dependencies: clientDefaultDate and form.reset
+  }, [clientDefaultDate, form.reset]);
 
   const categories = type === "income" ? incomeCategories : expenseCategories;
 
@@ -82,10 +80,10 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
       description: `${values.description} - $${Number(values.amount).toFixed(2)}`,
       variant: "default",
     });
-    if (clientDefaultDate) { // Use the same clientDefaultDate for consistency
+    if (clientDefaultDate) { 
        form.reset({
         description: "",
-        amount: '', // Reset with empty string
+        amount: undefined, 
         category: "",
         date: clientDefaultDate,
       });
@@ -159,10 +157,10 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
                   onChange={e => {
                     const val = e.target.value;
                     if (val === '') {
-                      field.onChange(''); // Allow empty string to clear the field
+                      field.onChange(undefined); 
                     } else {
                       const num = parseFloat(val);
-                      field.onChange(Number.isNaN(num) ? '' : num); // Pass number or empty string if not a valid number
+                      field.onChange(Number.isNaN(num) ? undefined : num); 
                     }
                   }}
                 />
