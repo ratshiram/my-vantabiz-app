@@ -137,10 +137,11 @@ export default function PricingPage() {
       console.error("Go Pro error during API call or redirect:", error);
       let description = "An unexpected error occurred. Please try again.";
       if (error instanceof Error) {
-        description = error.message;
         // Check for the specific "href" error message
         if (error.message && error.message.includes("Failed to set a named property 'href' on 'Location'")) {
             description = "Could not redirect to Stripe. This can happen due to restrictions in the current browsing environment (e.g., running in an iframe without top-navigation permission). If possible, try completing this action in a new, standalone browser tab or window.";
+        } else {
+            description = error.message;
         }
       } else {
         description = String(error);
