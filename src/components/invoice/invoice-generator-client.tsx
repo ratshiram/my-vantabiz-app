@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
 import { collection, doc, setDoc, Timestamp } from 'firebase/firestore';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
 
 const canadianTaxRates: Record<string, number> = { AB: 0.05,BC: 0.12,MB: 0.12,NB: 0.15,NL: 0.15,NT: 0.05,NS: 0.15,NU: 0.05,ON: 0.13,PE: 0.15,QC: 0.14975,SK: 0.11,YT: 0.05 };
 const provinces = Object.keys(canadianTaxRates).map(p => ({ value: p, label: `${p} (${(canadianTaxRates[p]*100).toFixed(canadianTaxRates[p] === 0.14975 ? 3:0)}%)`}));
@@ -26,7 +29,7 @@ export function InvoiceGeneratorClient() {
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessTaxId, setBusinessTaxId] = useState('');
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null); // Base64 string for logo
 
   const [clientName, setClientName] = useState('');
   const [clientAddress, setClientAddress] = useState('');
@@ -38,7 +41,6 @@ export function InvoiceGeneratorClient() {
   const [receiptNumber, setReceiptNumber] = useState('');
 
   const [previewHtml, setPreviewHtml] = useState<string>('<div class="text-center h-full flex items-center justify-center text-muted-foreground"><p>Receipt preview appears here</p></div>');
-  const pdfContentRef = useRef<HTMLDivElement>(null);
   const [canDownload, setCanDownload] = useState(false);
 
   useEffect(() => {
@@ -65,8 +67,8 @@ export function InvoiceGeneratorClient() {
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        toast({ title: "Logo Too Large", description: "Please upload a logo smaller than 2MB.", variant: "destructive" });
+      if (file.size > 1 * 1024 * 1024) { // 1MB limit for base64
+        toast({ title: "Logo Too Large", description: "Please upload a logo smaller than 1MB.", variant: "destructive" });
         return;
       }
       const reader = new FileReader();
@@ -79,42 +81,179 @@ export function InvoiceGeneratorClient() {
     const subtotal = serviceItems.reduce((sum, item) => sum + Number(item.amount), 0);
     let taxRate = 0;
     let taxAmount = 0;
-    let taxDisplay = 'No Tax';
+    let taxLabel = 'No Tax';
     let taxInfoForDoc: ClientTaxInfo = { option: 'none' };
 
-    if (taxOption === 'ca') {
+    if (taxOption === 'ca' && provinceTax && canadianTaxRates[provinceTax]) {
       taxRate = canadianTaxRates[provinceTax];
       taxAmount = subtotal * taxRate;
-      taxDisplay = `Tax (${provinceTax} @ ${(taxRate * 100).toFixed(canadianTaxRates[provinceTax] === 0.14975 ? 3:0)}%)`;
+      taxLabel = `Tax (${provinceTax} @ ${(taxRate * 100).toFixed(canadianTaxRates[provinceTax] === 0.14975 ? 3:0)}%)`;
       taxInfoForDoc = { option: 'ca', location: provinceTax, rate: taxRate, amount: taxAmount };
     }
     const totalAmount = subtotal + taxAmount;
-    return { subtotal, taxAmount, totalAmount, taxDisplay, taxInfoForDoc };
+    return { subtotal, taxAmount, totalAmount, taxLabel, taxInfoForDoc };
   };
 
   const generatePreview = () => {
-    const { subtotal, taxAmount, totalAmount, taxDisplay } = calculateTotals();
-    const formattedDate = paymentDate ? new Date(paymentDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
-    const servicesHtml = serviceItems.map(s => `<tr><td style="padding: 8px 16px 8px 0; border-bottom: 1px solid #eee;">${s.description || 'N/A'}</td><td style="text-align: right; padding: 8px 0 8px 16px; border-bottom: 1px solid #eee;">$${Number(s.amount).toFixed(2)}</td></tr>`).join('');
+    const { subtotal, taxAmount, totalAmount, taxLabel } = calculateTotals();
+    const formattedDate = paymentDate ? new Date(paymentDate + 'T00:00:00Z').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+    
+    const servicesHtml = serviceItems.map(s => `<tr><td style="padding: 8px 16px 8px 0; border-bottom: 1px solid #eee; word-break: break-word;">${s.description || 'N/A'}</td><td style="text-align: right; padding: 8px 0 8px 16px; border-bottom: 1px solid #eee;">$${Number(s.amount).toFixed(2)}</td></tr>`).join('');
+    
     let tfootHtml = `<tr><td style="padding: 8px 16px 2px 0; color: #6b7280; text-align: right;">Subtotal</td><td style="text-align: right; padding: 8px 0 2px 16px;">$${subtotal.toFixed(2)}</td></tr>`;
-    if (taxOption !== 'none') {
-        tfootHtml += `<tr><td style="padding: 2px 16px 8px 0; color: #6b7280; text-align: right;">${taxDisplay}</td><td style="text-align: right; padding: 2px 0 8px 16px;">$${taxAmount.toFixed(2)}</td></tr>`;
+    if (taxOption !== 'none' && taxAmount > 0) {
+        tfootHtml += `<tr><td style="padding: 2px 16px 8px 0; color: #6b7280; text-align: right;">${taxLabel}</td><td style="text-align: right; padding: 2px 0 8px 16px;">$${taxAmount.toFixed(2)}</td></tr>`;
     }
     tfootHtml += `<tr style="font-weight: bold; color: #111827;"><td style="padding-top: 8px; padding-right: 16px; text-align: right;">Total Paid</td><td style="text-align: right; padding-top: 8px; padding-left: 16px;">$${totalAmount.toFixed(2)}</td></tr>`;
-    const logoDisplayHtml = logoUrl ? `<img src="${logoUrl}" alt="Business Logo" style="margin-bottom: 2rem; max-height: 5rem; max-width: 10rem; object-fit: contain;">` : '';
-    const html = `<div style="font-family: 'Inter', Arial, sans-serif; font-size: 12px; padding: 20px; color: #374151;">${logoDisplayHtml}<table style="width: 100%; margin-bottom: 30px;"><tr><td style="vertical-align: top;"><h2 style="font-size: 24px; font-weight: bold; margin: 0; color: #111827;">${businessName || 'Your Business Name'}</h2><p style="margin: 0;">${businessAddress || 'Your Business Address'}</p>${businessTaxId ? `<p style="margin:0;">Tax ID: ${businessTaxId}</p>` : ''}</td><td style="text-align: right; vertical-align: top;"><h3 style="font-size: 20px; font-weight: bold; margin: 0; color: #1f2937;">RECEIPT</h3><p style="margin: 0;">#${receiptNumber || 'RCPT-XXXX'}</p><p style="margin: 0;">Date: ${formattedDate}</p></td></tr></table><div style="margin-bottom: 30px;"><h4 style="font-size: 10px; color: #6b7280; text-transform: uppercase; margin: 0 0 5px 0;">Bill To</h4><p style="font-weight: bold; margin: 0; color: #1f2937;">${clientName || 'Client Name'}</p><p style="margin: 0;">${clientAddress || 'Client Address'}</p></div><table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;"><thead style="border-bottom: 2px solid #333;"><tr style="color: #333;"><th style="text-align: left; font-weight: bold; padding-bottom: 8px;">Description</th><th style="text-align: right; font-weight: bold; padding-bottom: 8px;">Amount</th></tr></thead><tbody>${servicesHtml}</tbody><tfoot style="border-top: 2px solid #e5e7eb; font-medium;">${tfootHtml}</tfoot></table></div>`;
+    
+    const logoDisplayHtml = logoUrl ? `<img src="${logoUrl}" alt="Business Logo" style="margin-bottom: 1rem; max-height: 4rem; max-width: 10rem; object-fit: contain;">` : '';
+    
+    const html = `<div style="font-family: 'Inter', Arial, sans-serif; font-size: 12px; padding: 20px; color: #374151; max-width: 800px; margin: auto; border: 1px solid #e5e7eb; background: white;">
+                    ${logoDisplayHtml}
+                    <table style="width: 100%; margin-bottom: 20px;">
+                      <tr>
+                        <td style="vertical-align: top; width: 60%;">
+                          <h2 style="font-size: 20px; font-weight: bold; margin: 0 0 4px 0; color: #111827;">${businessName || 'Your Business Name'}</h2>
+                          <p style="margin: 0 0 2px 0; font-size: 11px;">${businessAddress || 'Your Business Address'}</p>
+                          ${businessTaxId ? `<p style="margin:0; font-size: 11px;">Tax ID: ${businessTaxId}</p>` : ''}
+                        </td>
+                        <td style="text-align: right; vertical-align: top; width: 40%;">
+                          <h3 style="font-size: 20px; font-weight: bold; margin: 0 0 4px 0; color: #1f2937;">RECEIPT</h3>
+                          <p style="margin: 0 0 2px 0; font-size: 11px;">#${receiptNumber || 'RCPT-XXXX'}</p>
+                          <p style="margin: 0; font-size: 11px;">Date: ${formattedDate}</p>
+                        </td>
+                      </tr>
+                    </table>
+                    <div style="margin-bottom: 20px;">
+                      <h4 style="font-size: 10px; color: #6b7280; text-transform: uppercase; margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 2px;">Bill To</h4>
+                      <p style="font-weight: bold; margin: 0 0 2px 0; color: #1f2937;">${clientName || 'Client Name'}</p>
+                      <p style="margin: 0; font-size: 11px;">${clientAddress || 'Client Address'}</p>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+                      <thead style="border-bottom: 2px solid #333;">
+                        <tr style="color: #333;">
+                          <th style="text-align: left; font-weight: bold; padding: 8px 16px 8px 0;">Description</th>
+                          <th style="text-align: right; font-weight: bold; padding: 8px 0 8px 16px;">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>${servicesHtml}</tbody>
+                      <tfoot style="border-top: 2px solid #e5e7eb; font-medium;">${tfootHtml}</tfoot>
+                    </table>
+                  </div>`;
     setPreviewHtml(html);
-    if (pdfContentRef.current) { pdfContentRef.current.innerHTML = html; }
     setCanDownload(true);
     toast({ title: "Preview Updated", description: "Receipt preview has been generated."});
   };
 
-  const handleDownloadPdf = async () => {
-    if (!canDownload || !pdfContentRef.current || typeof window === 'undefined') return;
-    const html2pdf = (await import('html2pdf.js')).default;
-    const elementToPrint = pdfContentRef.current.cloneNode(true) as HTMLElement;
-    elementToPrint.style.width = '8.5in';
-    html2pdf().from(elementToPrint).set({ margin: 0.5, filename: `Receipt-${receiptNumber || 'xxxx'}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: false }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }}).save();
+  const handleDownloadPdf = () => {
+    if (!canDownload || typeof window === 'undefined') return;
+    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0)) {
+        toast({ title: "Incomplete Form", description: "Please fill all required fields and add at least one valid service item.", variant: "destructive"});
+        return;
+    }
+
+    const doc = new jsPDF();
+    const { subtotal, taxAmount, totalAmount, taxLabel } = calculateTotals();
+    const formattedPaymentDate = paymentDate ? format(new Date(paymentDate + 'T00:00:00Z'), "MMMM d, yyyy") : 'N/A';
+    const pageMargin = 15;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let currentY = pageMargin;
+
+    // Logo
+    if (logoUrl) {
+      try {
+        const img = new Image();
+        img.src = logoUrl;
+        // Check image type for jspdf
+        const imgType = logoUrl.substring(logoUrl.indexOf('/') + 1, logoUrl.indexOf(';'));
+        if (imgType === 'png' || imgType === 'jpeg' || imgType === 'jpg') {
+            doc.addImage(logoUrl, imgType.toUpperCase(), pageMargin, currentY, 30, 15); // Adjust width/height as needed
+            currentY += 20; // Space after logo
+        } else {
+            console.warn("Unsupported image type for PDF logo:", imgType);
+        }
+      } catch (e) {
+        console.error("Error adding logo to PDF", e);
+      }
+    }
+    
+    // Header Section (Business Info & Receipt Info)
+    doc.setFontSize(18);
+    doc.text(businessName || "Your Business Name", pageMargin, currentY);
+    currentY += 7;
+    doc.setFontSize(10);
+    doc.text(businessAddress || "Your Business Address", pageMargin, currentY);
+    currentY += 5;
+    if (businessTaxId) {
+      doc.text(`Tax ID: ${businessTaxId}`, pageMargin, currentY);
+      currentY += 5;
+    }
+
+    const receiptInfoX = pageWidth - pageMargin;
+    doc.setFontSize(14).setFont(undefined, 'bold');
+    doc.text("RECEIPT", receiptInfoX, pageMargin + 5, { align: 'right' });
+    doc.setFontSize(10).setFont(undefined, 'normal');
+    doc.text(`#${receiptNumber || 'RCPT-XXXX'}`, receiptInfoX, pageMargin + 12, { align: 'right' });
+    doc.text(`Date: ${formattedPaymentDate}`, receiptInfoX, pageMargin + 17, { align: 'right' });
+    
+    currentY = Math.max(currentY, pageMargin + 25); // Ensure currentY is below header
+
+    // Bill To Section
+    currentY += 10;
+    doc.setFontSize(8).setTextColor(100);
+    doc.text("BILL TO", pageMargin, currentY);
+    currentY += 4;
+    doc.setFontSize(10).setTextColor(0);
+    doc.setFont(undefined, 'bold');
+    doc.text(clientName || "Client Name", pageMargin, currentY);
+    currentY += 5;
+    doc.setFont(undefined, 'normal');
+    doc.text(clientAddress || "Client Address", pageMargin, currentY);
+    currentY += 10;
+
+    // Services Table
+    const tableColumn = ["Description", "Amount"];
+    const tableRows = serviceItems.map(item => [
+      item.description,
+      `$${Number(item.amount).toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: currentY,
+      theme: 'striped',
+      headStyles: { fillColor: [70, 128, 144] }, // Slate Blue
+      columnStyles: {
+        0: { cellWidth: 'auto' },
+        1: { halign: 'right', cellWidth: 40 }
+      },
+      didDrawPage: (data) => {
+        currentY = data.cursor?.y || currentY;
+      }
+    });
+    currentY = (doc as any).lastAutoTable.finalY + 10;
+
+
+    // Totals Section
+    const totalsX = pageWidth - pageMargin - 50; // Align totals to the right
+    doc.setFontSize(10);
+    doc.text("Subtotal:", totalsX, currentY, { align: 'left' });
+    doc.text(`$${subtotal.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
+    currentY += 7;
+
+    if (taxOption !== 'none' && taxAmount > 0) {
+      doc.text(`${taxLabel}:`, totalsX, currentY, { align: 'left' });
+      doc.text(`$${taxAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
+      currentY += 7;
+    }
+
+    doc.setFont(undefined, 'bold');
+    doc.text("Total Paid:", totalsX, currentY, { align: 'left'});
+    doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
+
+    doc.save(`Receipt-${receiptNumber || 'xxxx'}.pdf`);
+    toast({ title: "PDF Downloaded", description: "Invoice PDF has been generated."});
   };
 
   const handleSaveInvoice = async () => {
@@ -122,7 +261,7 @@ export function InvoiceGeneratorClient() {
       toast({ title: "Not Logged In", description: "Please log in to save invoices.", variant: "destructive" });
       return;
     }
-    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount > 0)) {
+    if (!businessName || !clientName || serviceItems.length === 0 || !serviceItems.every(s => s.description && s.amount >= 0)) {
         toast({ title: "Incomplete Form", description: "Please fill all required fields and add at least one valid service item.", variant: "destructive"});
         return;
     }
@@ -135,12 +274,12 @@ export function InvoiceGeneratorClient() {
       userId: user.id,
       businessName,
       businessAddress,
-      taxId: businessTaxId,
-      logoUrl,
+      taxId: businessTaxId || undefined, // Ensure optional fields are undefined if empty
+      logoUrl: logoUrl || undefined,
       clientName,
       clientAddress,
       receiptNumber,
-      paymentDate: Timestamp.fromDate(new Date(paymentDate + 'T00:00:00')), // Store as Firestore Timestamp
+      paymentDate: Timestamp.fromDate(new Date(paymentDate + 'T00:00:00Z')), // Store as Firestore Timestamp in UTC
       services: serviceItems.map(s => ({ description: s.description, amount: s.amount })),
       subtotal,
       taxInfo: taxInfoForDoc,
@@ -183,7 +322,7 @@ export function InvoiceGeneratorClient() {
                 <div><Label htmlFor="business-name">Business Name</Label><Input id="business-name" value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="Your Business Name" required /></div>
                 <div><Label htmlFor="business-address">Business Address</Label><Input id="business-address" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} placeholder="Your Business Address" required /></div>
                 <div><Label htmlFor="business-tax-id">Tax ID (Optional)</Label><Input id="business-tax-id" value={businessTaxId} onChange={e => setBusinessTaxId(e.target.value)} placeholder="e.g., HST Number" /></div>
-                <div><Label htmlFor="logo-upload">Logo (Optional, max 2MB)</Label><Input id="logo-upload" type="file" accept="image/*" onChange={handleLogoUpload} className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"/></div>
+                <div><Label htmlFor="logo-upload">Logo (Optional, max 1MB, PNG/JPEG)</Label><Input id="logo-upload" type="file" accept="image/png, image/jpeg" onChange={handleLogoUpload} className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"/></div>
               </div>
             </div>
 
@@ -244,8 +383,8 @@ export function InvoiceGeneratorClient() {
             <CardHeader>
                 <CardTitle className="text-xl">Receipt Preview</CardTitle>
             </CardHeader>
-          <CardContent id="receipt-preview-container" className="min-h-[500px] p-1 bg-white rounded-md">
-            <div dangerouslySetInnerHTML={{ __html: previewHtml }} className="prose prose-sm max-w-none"/>
+          <CardContent id="receipt-preview-container" className="min-h-[500px] p-1 bg-gray-100 rounded-md overflow-auto">
+            <div dangerouslySetInnerHTML={{ __html: previewHtml }}/>
           </CardContent>
         </Card>
         <div className="flex justify-center items-center gap-4 mt-4">
@@ -258,7 +397,10 @@ export function InvoiceGeneratorClient() {
           </Button>
         </div>
       </div>
-      <div ref={pdfContentRef} style={{ position: 'absolute', left: '-9999px', top: '-9999px', fontFamily: 'Inter, Arial, sans-serif', fontSize: '12px', color: '#374151', background: 'white' }}></div>
+      {/* Removed the hidden div for html2pdf, as it's no longer used */}
     </div>
   );
 }
+
+
+    
