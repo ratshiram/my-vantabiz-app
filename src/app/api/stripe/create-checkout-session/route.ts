@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     // Check if it's a Stripe error object for more specific messages
     if (error && typeof error === 'object' && 'type' in error) {
-        const stripeError = error as Stripe.StripeError; // Type assertion
+        const stripeError = error as Stripe.StripeRawError; // Type assertion updated here
         console.error(`Stripe Error Type: ${stripeError.type}, Message: ${stripeError.message}`);
         if (stripeError.message) { // Use Stripe's error message if available
           errorMessage = `Stripe Error: ${stripeError.message}`;
