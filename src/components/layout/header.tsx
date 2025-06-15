@@ -8,7 +8,7 @@ export function AppHeader() {
       <Link href="/" className="inline-block group" aria-label="VantaBiz Home">
         {/* This div controls the size of the logo via height */}
         <div
-          className="relative h-16 w-auto sm:h-20" // Adjusted to medium size
+          className="relative h-12 w-auto sm:h-16" // Set to a moderate, visible size
         >
           <Image
             src="/vantabiz.png" // Points to public/vantabiz.png
