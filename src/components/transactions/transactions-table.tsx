@@ -1,14 +1,17 @@
 
 "use client";
 
-import React from 'react'; // Removed useRef as pdfContentRef is no longer needed
+import React from 'react';
 import { format } from "date-fns";
 import { Download } from "lucide-react";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Transaction } from "@/lib/types";
-import { incomeCategories, expenseCategories } from "./transaction-form-shared"; // For icons
+import { incomeCategories, expenseCategories } from "./transaction-form-shared";
 
 const categoryIcons = new Map([...incomeCategories, ...expenseCategories].map(cat => [cat.value, cat.icon]));
 
@@ -19,94 +22,83 @@ interface TransactionsTableProps {
 export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const sortedTransactions = [...transactions].sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  const handleDownloadReport = async () => {
-    if (typeof window !== 'undefined') {
-      const html2pdf = (await import('html2pdf.js')).default;
+  const handleDownloadReport = () => {
+    if (typeof window === 'undefined') return;
 
-      const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-      const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-      const profitOrLoss = totalIncome - totalExpenses;
+    const doc = new jsPDF();
 
-      let tableBodyHtml = '';
-      sortedTransactions.forEach(t => {
-        tableBodyHtml += `
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 8px 5px;">${format(t.date, "yyyy-MM-dd")}</td>
-            <td style="padding: 8px 5px;">${t.description ? t.description.replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</td>
-            <td style="padding: 8px 5px;">${t.category ? t.category.replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</td>
-            <td style="text-align: right; padding: 8px 5px; color: ${t.type === 'income' ? 'green' : 'red'};">
-              ${t.type === 'income' ? '+' : '-'}$${t.amount.toFixed(2)}
-            </td>
-          </tr>
-        `;
-      });
+    const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const profitOrLoss = totalIncome - totalExpenses;
 
-      const tableFooterHtml = `
-        <tr style="border-top: 2px solid #ccc; font-weight: bold;">
-          <td colspan="3" style="text-align: right; padding: 8px 5px;">Total Income:</td>
-          <td style="text-align: right; padding: 8px 5px; color: green;">
-            $${totalIncome.toFixed(2)}
-          </td>
-        </tr>
-        <tr style="font-weight: bold;">
-          <td colspan="3" style="text-align: right; padding: 8px 5px;">Total Expenses:</td>
-          <td style="text-align: right; padding: 8px 5px; color: red;">
-            $${totalExpenses.toFixed(2)}
-          </td>
-        </tr>
-        <tr style="font-weight: bold; border-top: 1px solid #ccc;">
-          <td colspan="3" style="text-align: right; padding: 8px 5px;">Profit/Loss:</td>
-          <td style="text-align: right; padding: 8px 5px;">
-            $${profitOrLoss.toFixed(2)}
-          </td>
-        </tr>
-      `;
+    // Add Title
+    doc.setFontSize(18);
+    doc.text("Transaction Report", 14, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Generated on: ${format(new Date(), "yyyy-MM-dd HH:mm")}`, 14, 29);
 
-      const reportHtml = `
-        <div style="font-family: Arial, sans-serif; padding: 20px; font-size: 10px; width: 7.5in;">
-          <h2 style="text-align: center; font-size: 16px; margin-bottom: 15px;">Transaction Report</h2>
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="border-bottom: 1px solid #ccc; background-color: #f0f0f0;">
-                <th style="text-align: left; padding: 8px 5px; width: 20%;">Date</th>
-                <th style="text-align: left; padding: 8px 5px; width: 35%;">Description</th>
-                <th style="text-align: left; padding: 8px 5px; width: 20%;">Category</th>
-                <th style="text-align: right; padding: 8px 5px; width: 25%;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${sortedTransactions.length > 0 ? tableBodyHtml : '<tr><td colspan="4" style="text-align:center; padding: 20px;">No transactions to display.</td></tr>'}
-            </tbody>
-            ${sortedTransactions.length > 0 ? `<tfoot>${tableFooterHtml}</tfoot>` : ''}
-          </table>
-        </div>
-      `;
-      
-      const reportElement = document.createElement('div');
-      reportElement.innerHTML = reportHtml;
-      
-      reportElement.style.position = 'absolute';
-      reportElement.style.left = '-9999px'; // Position off-screen
-      reportElement.style.top = '-9999px';
-      document.body.appendChild(reportElement);
+    // Define table columns and rows
+    const tableColumn = ["Date", "Description", "Category", "Type", "Amount"];
+    const tableRows: (string | number)[][] = [];
 
-      html2pdf().from(reportElement.firstChild || reportElement) // Use firstChild to get the actual report content div
-        .set({
-          margin: 0.5,
-          filename: 'Financial-Report.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
-          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        })
-        .save()
-        .then(() => {
-          document.body.removeChild(reportElement);
-        })
-        .catch(err => {
-          console.error("Failed to generate PDF:", err);
-          document.body.removeChild(reportElement);
-        });
-    }
+    sortedTransactions.forEach(transaction => {
+      const transactionData = [
+        format(transaction.date, "yyyy-MM-dd"),
+        transaction.description,
+        transaction.category,
+        transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1),
+        `$${transaction.amount.toFixed(2)}`
+      ];
+      tableRows.push(transactionData);
+    });
+
+    // Add table to PDF
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 35,
+      theme: 'striped', // or 'grid', 'plain'
+      headStyles: { fillColor: [22, 160, 133] }, // Example: Teal color
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      styles: { fontSize: 9, cellPadding: 2.5 },
+      columnStyles: {
+        0: { cellWidth: 25 }, // Date
+        1: { cellWidth: 'auto' }, // Description
+        2: { cellWidth: 35 }, // Category
+        3: { cellWidth: 20 }, // Type
+        4: { cellWidth: 25, halign: 'right' }, // Amount
+      }
+    });
+
+    let finalY = (doc as any).lastAutoTable.finalY || 50; // Get Y position of the EOT
+
+    // Add Summary
+    doc.setFontSize(12);
+    doc.text("Summary:", 14, finalY + 10);
+    finalY += 10;
+
+    const summaryData = [
+        ["Total Income:", `$${totalIncome.toFixed(2)}`],
+        ["Total Expenses:", `$${totalExpenses.toFixed(2)}`],
+        ["Profit / Loss:", `$${profitOrLoss.toFixed(2)}`]
+    ];
+
+    autoTable(doc, {
+        body: summaryData,
+        startY: finalY + 5,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 2 },
+        columnStyles: {
+            0: { halign: 'right', fontStyle: 'bold' },
+            1: { halign: 'right' }
+        },
+        tableWidth: 'wrap', // Adjust table width to content
+        margin: {left: doc.internal.pageSize.getWidth() - 70} // Align summary table to the right
+    });
+    
+
+    doc.save("Financial-Report.pdf");
   };
   
   return (
@@ -159,7 +151,6 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
           </Table>
         </div>
       </CardContent>
-      {/* The hidden div for PDF generation has been removed as it's now generated dynamically in handleDownloadReport */}
     </Card>
   );
 }
