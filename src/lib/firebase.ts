@@ -24,13 +24,13 @@ const firebaseConfigValues = {
 // Maps the internal keys of firebaseConfigValues to the exact environment variable names
 // for more helpful error messages.
 const expectedEnvVarNames: Record<keyof typeof firebaseConfigValues, string> = {
-  apiKey: 'NEXT_PUBLIC_FIREBASE_API_KEY',
-  authDomain: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-  projectId: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-  storageBucket: 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-  messagingSenderId: 'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-  appId: 'NEXT_PUBLIC_FIREBASE_APP_ID',
-  measurementId: 'NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID',
+  apiKey: 'AIzaSyBwJh2-CUhm7qE2C8NMEytfQm7sbxzKfUc',
+  authDomain: 'fintrack-lite-10936.firebaseapp.com',
+  projectId: 'fintrack-lite-10936',
+  storageBucket: 'fintrack-lite-10936.firebasestorage.app',
+  messagingSenderId: '44749033941',
+  appId: '1:44749033941:web:fa9dbebe835f2977932d5c',
+  measurementId: 'G-HR7ZDD6THC',
 };
 
 const requiredConfigKeys: (keyof typeof firebaseConfigValues)[] = [

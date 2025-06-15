@@ -25,8 +25,8 @@ interface TransactionsTableProps {
 }
 
 export function TransactionsTable({ transactions }: TransactionsTableProps) {
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
-  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [startDate, setStartDate] = React.useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = React.useState<Date | undefined>(undefined);
   const { toast } = useToast(); 
 
   const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -110,9 +110,9 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       }
     });
 
-    let tableEndY = (doc as any).lastAutoTable?.finalY || mainTableStartY;
-    if (tableRows.length === 0) { 
-        tableEndY = mainTableStartY;
+    let tableEndY = (doc as any).lastAutoTable?.finalY;
+    if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
+      tableEndY = mainTableStartY; // Fallback if autoTable didn't return a valid Y or if no table was drawn
     }
     currentY = tableEndY; 
 
@@ -128,14 +128,17 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     
     const summaryTableStartY = currentY + 15; 
     
-    const pageWidthForSummary = doc.internal.pageSize.getWidth();
+    let pageWidthForSummary = doc.internal.pageSize.getWidth();
     if (typeof pageWidthForSummary !== 'number' || pageWidthForSummary <= 0) {
         console.error("Invalid pageWidth for PDF summary:", pageWidthForSummary);
         toast({ title: "PDF Error", description: "Could not determine page width for PDF summary.", variant: "destructive" });
-        // Optionally, don't draw the summary table or use a default width
+        pageWidthForSummary = 210; // Default to A4 width as a fallback
     }
 
-    const summaryTableMarginLeft = Math.max(pageMargin, (pageWidthForSummary || 210) - 80 - pageMargin); // Use default A4 width if invalid
+    let summaryTableMarginLeft = Math.max(pageMargin, pageWidthForSummary - 80 - pageMargin); 
+    if (typeof summaryTableMarginLeft !== 'number' || isNaN(summaryTableMarginLeft) || summaryTableMarginLeft < 0) {
+        summaryTableMarginLeft = pageMargin; // Fallback margin
+    }
 
 
     autoTable(doc, {
@@ -263,4 +266,3 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
     </Card>
   );
 }
-

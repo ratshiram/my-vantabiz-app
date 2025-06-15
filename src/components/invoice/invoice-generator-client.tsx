@@ -23,28 +23,28 @@ const provinces = Object.keys(canadianTaxRates).map(p => ({ value: p, label: `${
 export function InvoiceGeneratorClient() {
   const { toast } = useToast();
   const { user, isLoading: authLoading, updateUserBusinessDetails } = useAuth();
-  const [isClient, setIsClient] = useState(false);
-  const [isSavingInvoice, setIsSavingInvoice] = useState(false);
-  const [isSavingBusinessInfo, setIsSavingBusinessInfo] = useState(false);
+  const [isClient, setIsClient] = React.useState(false);
+  const [isSavingInvoice, setIsSavingInvoice] = React.useState(false);
+  const [isSavingBusinessInfo, setIsSavingBusinessInfo] = React.useState(false);
   
-  const [businessName, setBusinessName] = useState('');
-  const [businessAddress, setBusinessAddress] = useState('');
-  const [businessTaxId, setBusinessTaxId] = useState('');
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [businessName, setBusinessName] = React.useState('');
+  const [businessAddress, setBusinessAddress] = React.useState('');
+  const [businessTaxId, setBusinessTaxId] = React.useState('');
+  const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
 
-  const [clientName, setClientName] = useState('');
-  const [clientAddress, setClientAddress] = useState('');
+  const [clientName, setClientName] = React.useState('');
+  const [clientAddress, setClientAddress] = React.useState('');
 
-  const [serviceItems, setServiceItems] = useState<ClientServiceItem[]>([{ id: crypto.randomUUID(), description: '', amount: 0 }]);
-  const [taxOption, setTaxOption] = useState('none');
-  const [provinceTax, setProvinceTax] = useState('NL'); 
-  const [paymentDate, setPaymentDate] = useState('');
-  const [receiptNumber, setReceiptNumber] = useState('');
+  const [serviceItems, setServiceItems] = React.useState<ClientServiceItem[]>([{ id: crypto.randomUUID(), description: '', amount: 0 }]);
+  const [taxOption, setTaxOption] = React.useState('none');
+  const [provinceTax, setProvinceTax] = React.useState('NL'); 
+  const [paymentDate, setPaymentDate] = React.useState('');
+  const [receiptNumber, setReceiptNumber] = React.useState('');
 
-  const [previewHtml, setPreviewHtml] = useState<string>('<div class="text-center h-full flex items-center justify-center text-muted-foreground"><p>Receipt preview appears here after filling the form and clicking "Generate & Preview".</p></div>');
-  const [canDownload, setCanDownload] = useState(false);
+  const [previewHtml, setPreviewHtml] = React.useState<string>('<div class="text-center h-full flex items-center justify-center text-muted-foreground"><p>Receipt preview appears here after filling the form and clicking "Generate & Preview".</p></div>');
+  const [canDownload, setCanDownload] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     setIsClient(true);
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setReceiptNumber(`RCPT-${Date.now().toString().slice(-6)}`); 
@@ -53,7 +53,7 @@ export function InvoiceGeneratorClient() {
     }
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (user && isClient) {
       setBusinessName(user.businessName || '');
       setBusinessAddress(user.businessAddress || '');
@@ -182,59 +182,46 @@ export function InvoiceGeneratorClient() {
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = pageMargin;
 
-    if (logoUrl && logoUrl.trim()) {
-      try {
-        const imgTypeMatch = logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
-        if (imgTypeMatch && imgTypeMatch[1]) {
-            const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
-            
-            const image = new Image();
-            
-            // Wrap the promise in its own try-catch to specifically handle image load errors
-            try {
-                await new Promise<void>((resolve, reject) => {
-                  image.onload = () => resolve();
-                  image.onerror = (err) => {
-                    console.error("Image load error for PDF (generator):", err);
-                    toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
-                    reject(new Error("Image load error for PDF generation")); 
-                  };
-                  image.src = logoUrl; 
-                });
+    if (logoUrl && typeof logoUrl === 'string' && logoUrl.trim().startsWith('data:image/')) {
+      const imgTypeMatch = logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
+      if (imgTypeMatch && imgTypeMatch[1]) {
+        const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
+        const image = new Image();
+        try {
+          await new Promise<void>((resolve, reject) => {
+            image.onload = () => resolve();
+            image.onerror = (err) => {
+              console.error("Image load error for PDF (generator):", err);
+              toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. Please check the image file or URL.", variant: "destructive" });
+              reject(new Error("Image load error for PDF generation"));
+            };
+            image.src = logoUrl;
+          });
 
-                const logoMaxHeight = 15; 
-                const logoMaxWidth = 40;  
-                let imgWidth = image.naturalWidth;
-                let imgHeight = image.naturalHeight;
+          const logoMaxHeight = 15;
+          const logoMaxWidth = 40;
+          let imgWidth = image.naturalWidth;
+          let imgHeight = image.naturalHeight;
 
-                if (imgWidth > logoMaxWidth) {
-                    const ratio = logoMaxWidth / imgWidth;
-                    imgWidth = logoMaxWidth;
-                    imgHeight = imgHeight * ratio;
-                }
-                if (imgHeight > logoMaxHeight) {
-                    const ratio = logoMaxHeight / imgHeight;
-                    imgHeight = logoMaxHeight;
-                    imgWidth = imgWidth * ratio;
-                }
-                doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight); 
-                currentY += imgHeight + 5;
-
-            } catch (imgLoadOrAddError) {
-                // This catch block handles rejections from the new Promise (e.g., image.onerror)
-                // or errors from doc.addImage if it's moved inside this specific try-catch
-                console.error("Error during image loading or adding to PDF (generator):", imgLoadOrAddError);
-                // Toast for image load error is already handled in image.onerror
-                // If doc.addImage fails, we might want a specific toast here or rely on the onerror toast.
-            }
-        } else {
-            console.warn("Unsupported image type for PDF logo or invalid data URI format (generator).");
-            toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
+          if (imgWidth > logoMaxWidth) {
+            const ratio = logoMaxWidth / imgWidth;
+            imgWidth = logoMaxWidth;
+            imgHeight = imgHeight * ratio;
+          }
+          if (imgHeight > logoMaxHeight) {
+            const ratio = logoMaxHeight / imgHeight;
+            imgHeight = logoMaxHeight;
+            imgWidth = imgWidth * ratio;
+          }
+          doc.addImage(logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
+          currentY += imgHeight + 5;
+        } catch (imgLoadOrAddError) {
+          console.error("Error processing logo for PDF (generator):", imgLoadOrAddError);
+          // Toast is handled in image.onerror
         }
-      } catch (e) {
-        // This is a fallback catch for the entire logo processing block, though specific errors should be caught above.
-        console.error("Outer error processing logo for PDF (generator)", e);
-        toast({ title: "Logo Processing Error", description: "An unexpected error occurred while preparing the logo.", variant: "destructive" });
+      } else {
+        console.warn("Unsupported image type for PDF logo or invalid data URI format (generator).");
+        toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
       }
     }
     
@@ -251,8 +238,11 @@ export function InvoiceGeneratorClient() {
 
     const receiptInfoX = pageWidth - pageMargin;
     let receiptBlockY = pageMargin; 
-    if (logoUrl && logoUrl.trim()) receiptBlockY = pageMargin; 
-    else receiptBlockY = Math.max(pageMargin, currentY - (businessTaxId ? 17 : 12) );
+    if (logoUrl && typeof logoUrl === 'string' && logoUrl.trim().startsWith('data:image/')) {
+        // No change to receiptBlockY if logo was attempted, currentY already advanced
+    } else {
+        receiptBlockY = Math.max(pageMargin, currentY - (businessTaxId ? 17 : 12) );
+    }
 
 
     doc.setFontSize(14).setFont(undefined, 'bold');
@@ -293,9 +283,9 @@ export function InvoiceGeneratorClient() {
       },
     });
     
-    let tableEndY = (doc as any).lastAutoTable?.finalY || currentY;
-     if (tableRowsData.length === 0) { 
-        tableEndY = currentY; 
+    let tableEndY = (doc as any).lastAutoTable?.finalY;
+    if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
+      tableEndY = currentY; // Fallback if autoTable didn't return a valid Y
     }
     currentY = tableEndY + 10;
 
@@ -349,7 +339,7 @@ export function InvoiceGeneratorClient() {
       taxInfo: taxInfoForDoc,
       totalAmount,
       createdAt: Timestamp.now(),
-      logoUrl: (logoUrl && logoUrl.trim()) ? logoUrl : null, 
+      logoUrl: (logoUrl && typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl : null, 
     };
 
     const invoiceToSave: InvoiceDocument = {
@@ -513,4 +503,3 @@ export function InvoiceGeneratorClient() {
     </div>
   );
 }
-

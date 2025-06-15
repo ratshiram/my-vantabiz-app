@@ -31,60 +31,47 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     const pageWidth = doc.internal.pageSize.getWidth();
     let currentY = pageMargin;
 
-    if (invoice.logoUrl && invoice.logoUrl.trim()) {
-      try {
-        const imgTypeMatch = invoice.logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
-        if (imgTypeMatch && imgTypeMatch[1]) {
-            const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
-            
-            const image = new Image();
-            
-            // Wrap the promise in its own try-catch to specifically handle image load errors
-            try {
-                await new Promise<void>((resolve, reject) => {
-                  image.onload = () => resolve();
-                  image.onerror = (err) => { // This block is for image load failure
-                    console.error("Image load error for PDF (list-table):", err);
-                    toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
-                    reject(new Error("Image load error for PDF generation")); 
-                  };
-                  image.src = invoice.logoUrl!; // Non-null assertion is okay due to prior check
-                });
+    if (invoice.logoUrl && typeof invoice.logoUrl === 'string' && invoice.logoUrl.trim().startsWith('data:image/')) {
+      const imgTypeMatch = invoice.logoUrl.match(/^data:image\/(png|jpeg|jpg);base64,/);
+      if (imgTypeMatch && imgTypeMatch[1]) {
+        const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
+        const image = new Image();
+        try {
+          await new Promise<void>((resolve, reject) => {
+            image.onload = () => resolve();
+            image.onerror = (err) => {
+              console.error("Image load error for PDF (list-table):", err);
+              toast({ title: "Logo Load Error", description: "Could not load logo image for PDF. The image might be corrupted or the URL invalid.", variant: "destructive" });
+              reject(new Error("Image load error for PDF generation"));
+            };
+            image.src = invoice.logoUrl;
+          });
 
-                // If promise resolved (image loaded), proceed to calculate dimensions and add
-                const logoMaxHeight = 15;
-                const logoMaxWidth = 40;
-                let imgWidth = image.naturalWidth;
-                let imgHeight = image.naturalHeight;
+          const logoMaxHeight = 15;
+          const logoMaxWidth = 40;
+          let imgWidth = image.naturalWidth;
+          let imgHeight = image.naturalHeight;
 
-                if (imgWidth > logoMaxWidth) {
-                    const ratio = logoMaxWidth / imgWidth;
-                    imgWidth = logoMaxWidth;
-                    imgHeight = imgHeight * ratio;
-                }
-                if (imgHeight > logoMaxHeight) {
-                    const ratio = logoMaxHeight / imgHeight;
-                    imgHeight = logoMaxHeight;
-                    imgWidth = imgWidth * ratio;
-                }
-                
-                doc.addImage(invoice.logoUrl!, imgType, pageMargin, currentY, imgWidth, imgHeight);
-                currentY += imgHeight + 5; 
-
-            } catch (imgLoadOrAddError) {
-                // This catch block handles rejections from the new Promise (e.g., image.onerror)
-                // Or potentially errors from doc.addImage if it were moved inside and failed
-                console.error("Error during image loading or adding to PDF (list-table):", imgLoadOrAddError);
-                // Toast for image load error is already handled by image.onerror, so no redundant toast here unless specifically for addImage issues
-            }
-        } else {
-            console.warn("Invoice logoUrl is not a valid data URI or unsupported image type (list-table).");
-            toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
+          if (imgWidth > logoMaxWidth) {
+            const ratio = logoMaxWidth / imgWidth;
+            imgWidth = logoMaxWidth;
+            imgHeight = imgHeight * ratio;
+          }
+          if (imgHeight > logoMaxHeight) {
+            const ratio = logoMaxHeight / imgHeight;
+            imgHeight = logoMaxHeight;
+            imgWidth = imgWidth * ratio;
+          }
+          
+          doc.addImage(invoice.logoUrl, imgType, pageMargin, currentY, imgWidth, imgHeight);
+          currentY += imgHeight + 5;
+        } catch (imgLoadOrAddError) {
+          console.error("Error processing logo for PDF (list-table):", imgLoadOrAddError);
+          // Toast is handled in image.onerror
         }
-      } catch (e) {
-        // This is a fallback catch for the entire logo processing block
-        console.error("Outer error processing logo for PDF (list-table)", e);
-        toast({ title: "Logo Processing Error", description: "An unexpected error occurred while preparing the logo.", variant: "destructive" });
+      } else {
+        console.warn("Invoice logoUrl is not a valid data URI or unsupported image type (list-table).");
+        toast({ title: "Logo Warning", description: "Logo image format might not be suitable for PDF (expected PNG, JPEG, JPG data URI).", variant: "default" });
       }
     }
 
@@ -101,9 +88,13 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     }
 
     const receiptInfoX = pageWidth - pageMargin;
-    let receiptBlockY = pageMargin; 
-    if (invoice.logoUrl && invoice.logoUrl.trim()) receiptBlockY = pageMargin; 
-    else receiptBlockY = Math.max(pageMargin, currentY - (invoice.taxId ? 17 : 12) ); 
+    let receiptBlockY = pageMargin;
+    if (invoice.logoUrl && typeof invoice.logoUrl === 'string' && invoice.logoUrl.trim().startsWith('data:image/')) {
+        // No change to receiptBlockY if logo was attempted, currentY already advanced
+    } else {
+        receiptBlockY = Math.max(pageMargin, currentY - (invoice.taxId ? 17 : 12) );
+    }
+
 
     doc.setFontSize(14).setFont(undefined, 'bold');
     doc.text("RECEIPT", receiptInfoX, receiptBlockY + 5, { align: 'right' });
@@ -131,10 +122,11 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
       `$${Number(service.amount).toFixed(2)}`
     ]);
 
+    const mainTableStartY = currentY;
     autoTable(doc, {
       head: [tableColumn],
       body: tableRowsData,
-      startY: currentY,
+      startY: mainTableStartY,
       theme: 'striped',
       headStyles: { fillColor: [70, 128, 144] }, 
       columnStyles: {
@@ -143,9 +135,9 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
       },
     });
     
-    let tableEndY = (doc as any).lastAutoTable?.finalY || currentY;
-    if (tableRowsData.length === 0) { 
-        tableEndY = currentY;
+    let tableEndY = (doc as any).lastAutoTable?.finalY;
+    if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
+      tableEndY = mainTableStartY; // Fallback if autoTable didn't return a valid Y
     }
     currentY = tableEndY + 10;
 
@@ -223,4 +215,3 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     </Card>
   );
 }
-
