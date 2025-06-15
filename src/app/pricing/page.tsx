@@ -1,6 +1,14 @@
+
+"use client";
+
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import { loadStripe } from '@stripe/stripe-js';
+import Link from 'next/link';
 
 const tiers = [
   {
@@ -15,6 +23,7 @@ const tiers = [
     ],
     cta: "Start Free Trial",
     variant: "outline" as "outline",
+    id: "free",
   },
   {
     name: "Pro",
@@ -31,10 +40,77 @@ const tiers = [
     cta: "Go Pro",
     variant: "default" as "default",
     popular: true,
+    id: "pro",
   },
 ];
 
+// Initialize Stripe.js with your publishable key
+// Make sure NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is set in your .env.local or environment variables
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
 export default function PricingPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isLoadingPro, setIsLoadingPro] = useState(false);
+
+  const handleGoProClick = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in or sign up to upgrade to Pro.",
+        variant: "destructive",
+      });
+      // Optionally redirect to login: router.push('/login');
+      return;
+    }
+
+    setIsLoadingPro(true);
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }), // Send user ID to associate with Stripe customer/session
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create checkout session.');
+      }
+
+      const { sessionId } = await response.json();
+      if (!sessionId) {
+        throw new Error('Checkout session ID not found.');
+      }
+
+      const stripe = await stripePromise;
+      if (!stripe) {
+        throw new Error('Stripe.js failed to load.');
+      }
+
+      const { error } = await stripe.redirectToCheckout({ sessionId });
+
+      if (error) {
+        console.error("Stripe redirect error:", error);
+        toast({
+          title: "Payment Error",
+          description: error.message || "Could not redirect to Stripe. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Go Pro error:", error);
+      toast({
+        title: "Upgrade Failed",
+        description: (error instanceof Error ? error.message : String(error)) || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingPro(false);
+    }
+  };
+
   return (
     <main className="container mx-auto p-4 sm:p-6 lg:p-8 flex-grow">
       <div className="text-center mb-12">
@@ -71,9 +147,22 @@ export default function PricingPage() {
               </ul>
             </CardContent>
             <CardFooter>
-              <Button className="w-full text-lg py-6" variant={tier.variant}>
-                {tier.cta}
-              </Button>
+              {tier.id === "pro" ? (
+                <Button 
+                  className="w-full text-lg py-6" 
+                  variant={tier.variant} 
+                  onClick={handleGoProClick}
+                  disabled={isLoadingPro}
+                >
+                  {isLoadingPro && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                  {isLoadingPro ? "Processing..." : tier.cta}
+                </Button>
+              ) : (
+                 <Button asChild className="w-full text-lg py-6" variant={tier.variant}>
+                    {/* Free trial button likely links to signup or dashboard if already logged in */}
+                    <Link href={user ? "/" : "/signup"}>{tier.cta}</Link>
+                </Button>
+              )}
             </CardFooter>
           </Card>
         ))}
