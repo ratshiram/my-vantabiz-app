@@ -33,6 +33,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
 
     if (invoice.logoUrl && typeof invoice.logoUrl === 'string' && invoice.logoUrl.trim().startsWith('data:image/')) {
       const currentLogoUrlConst: string = invoice.logoUrl; 
+      // Ensure currentLogoUrlConst is definitely a string before assigning to image.src
       if (typeof currentLogoUrlConst === 'string') { 
         const imgTypeMatch = currentLogoUrlConst.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
@@ -45,11 +46,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
                 console.error("Image load error for PDF (list-table):", errEvt);
                 reject(new Error("Image load error for PDF generation: Failed to load logo."));
               };
-              if (typeof currentLogoUrlConst === 'string') { // Ensure it's still a string
-                image.src = currentLogoUrlConst;
-              } else {
-                reject(new Error("Logo URL is not a string.")); // Should not happen if initial checks passed
-              }
+               image.src = currentLogoUrlConst; // Safe: currentLogoUrlConst is confirmed string
             });
 
             const logoMaxHeight = 15;
@@ -142,7 +139,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
       },
     });
     
-    let tableEndY = (doc as any).lastAutoTable?.finalY;
+    let tableEndY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
       tableEndY = mainTableStartY + (tableRowsData.length * 10) + 10; 
     }

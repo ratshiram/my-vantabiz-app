@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { format } from "date-fns";
 import { Download, CalendarIcon } from "lucide-react";
 import jsPDF from 'jspdf';
@@ -15,8 +15,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { Transaction } from "@/lib/types";
 import { incomeCategories, expenseCategories } from "./transaction-form-shared";
 import { cn } from "@/lib/utils";
-import { useToast } from '@/hooks/use-toast';
-
 
 const categoryIconsMap = new Map([...incomeCategories, ...expenseCategories].map(cat => [cat.value, cat.icon]));
 
@@ -27,8 +25,7 @@ interface TransactionsTableProps {
 export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const [startDate, setStartDate] = React.useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = React.useState<Date | undefined>(undefined);
-  const { toast } = useToast();
-
+  
   const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const handleDownloadReport = () => {
@@ -110,7 +107,7 @@ export function TransactionsTable({ transactions }: TransactionsTableProps) {
       }
     });
 
-    let tableEndY = (doc as any).lastAutoTable?.finalY;
+    let tableEndY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
       tableEndY = mainTableStartY + (tableRows.length > 0 ? tableRows.length * 10 : 0) + 10;
     }

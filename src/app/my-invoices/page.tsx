@@ -111,7 +111,7 @@ export default function MyInvoicesPage() {
             </CardHeader>
             <CardContent>
                 <Info className="h-12 w-12 mx-auto text-primary mb-4" />
-                <p className="text-muted-foreground mb-4">You haven't saved any invoices. Create one now!</p>
+                <p className="text-muted-foreground mb-4">You haven&apos;t saved any invoices. Create one now!</p>
                 <Button asChild variant="default">
                     <Link href="/invoice-generator">Go to Invoice Generator</Link>
                 </Button>

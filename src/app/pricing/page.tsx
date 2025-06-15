@@ -22,7 +22,7 @@ const tiers = [
       "Limited to 5 invoices",
     ],
     cta: "Start Free Trial",
-    variant: "outline" as "outline",
+    variant: "outline" as const,
     id: "free",
   },
   {
@@ -38,7 +38,7 @@ const tiers = [
       "Data export options",
     ],
     cta: "Go Pro",
-    variant: "default" as "default",
+    variant: "default" as const,
     popular: true,
     id: "pro",
   },
@@ -116,8 +116,15 @@ export default function PricingPage() {
         throw new Error('Stripe.js failed to load. Please check your internet connection or ad-blockers.');
       }
 
+      // The error TS2345 below is because `redirectToCheckout` can throw for various reasons,
+      // including the cross-origin navigation issue if the redirect is blocked by the browser (e.g. in a sandboxed iframe).
+      // Such an error will be caught by the outer try-catch block.
       const { error: stripeJsError } = await stripe.redirectToCheckout({ sessionId });
 
+      // This 'stripeJsError' is an error object returned by Stripe.js if it identifies an issue
+      // *before* attempting the actual redirection (e.g., invalid session ID).
+      // If the redirection itself fails due to browser policy (like in an iframe),
+      // `redirectToCheckout` might throw an exception that is caught by the outer `catch` block.
       if (stripeJsError) {
         console.error("Stripe.js reported an error before redirect:", stripeJsError);
         toast({
@@ -154,7 +161,7 @@ export default function PricingPage() {
       <div className="text-center mb-12">
         <h1 className="text-4xl sm:text-5xl font-extrabold text-foreground">Simple, Transparent Pricing</h1>
         <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-          Choose the plan that's right for your business. Start for free, then upgrade when you're ready.
+          Choose the plan that&apos;s right for your business. Start for free, then upgrade when you&apos;re ready.
         </p>
       </div>
 

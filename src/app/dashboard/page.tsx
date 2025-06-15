@@ -11,7 +11,7 @@ import type { Transaction, TransactionFormValues, MonthlyData } from '@/lib/type
 import { format, getYear } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, orderBy, Timestamp, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, Timestamp, doc, setDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 
 export default function FinTrackPage() {

@@ -1,18 +1,18 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { PlusCircle, Trash2, Download, Save, Loader2, Info } from 'lucide-react';
-import type { InvoiceDocument, ServiceItem as ClientServiceItem, TaxInfo as ClientTaxInfo, InvoiceWriteData } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PlusCircle, Trash2, Download, Save, Loader2 } from 'lucide-react';
+import type { ServiceItem as ClientServiceItem, TaxInfo as ClientTaxInfo, InvoiceWriteData } from '@/lib/types';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { collection, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -45,6 +45,10 @@ export function InvoiceGeneratorClient() {
   const [previewHtml, setPreviewHtml] = React.useState<string>('<div class="text-center h-full flex items-center justify-center text-muted-foreground"><p>Receipt preview appears here after filling the form and clicking "Generate & Preview".</p></div>');
   const [canDownload, setCanDownload] = React.useState(false);
 
+  const addServiceItem = React.useCallback(() => {
+    setServiceItems(prevItems => [...prevItems, { id: crypto.randomUUID(), description: '', amount: 0 }]);
+  }, []);
+
   React.useEffect(() => {
     setIsClient(true);
     setPaymentDate(new Date().toISOString().split('T')[0]);
@@ -52,7 +56,7 @@ export function InvoiceGeneratorClient() {
     if (serviceItems.length === 0) {
       addServiceItem();
     }
-  }, []);
+  }, [addServiceItem, serviceItems.length]);
 
   React.useEffect(() => {
     if (user && isClient) {
@@ -63,10 +67,6 @@ export function InvoiceGeneratorClient() {
     }
   }, [user, isClient]);
 
-
-  const addServiceItem = () => {
-    setServiceItems([...serviceItems, { id: crypto.randomUUID(), description: '', amount: 0 }]);
-  };
 
   const removeServiceItem = (id: string) => {
     setServiceItems(serviceItems.filter(item => item.id !== id));
@@ -271,7 +271,7 @@ export function InvoiceGeneratorClient() {
 
     const tableColumn = ["Description", "Amount"];
     const tableRowsData = serviceItems.map(item => [
-      item.description,
+      String(item.description),
       `$${Number(item.amount).toFixed(2)}`
     ]);
 
@@ -287,7 +287,7 @@ export function InvoiceGeneratorClient() {
       },
     });
     
-    let tableEndY = (doc as any).lastAutoTable?.finalY;
+    let tableEndY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
     if (typeof tableEndY !== 'number' || isNaN(tableEndY)) {
       tableEndY = currentY + (tableRowsData.length * 10) + 10; 
     }

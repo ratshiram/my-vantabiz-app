@@ -48,15 +48,7 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
   // Initialize with propDefaultDate if available, otherwise undefined.
   // Date will be set to new Date() client-side if propDefaultDate is not provided.
   const initialDate = propDefaultDate;
-
-  useEffect(() => {
-    setIsClientSide(true);
-    if (!propDefaultDate) {
-      // If no defaultDate prop, set it to current date only on client
-      form.setValue('date', new Date(), { shouldValidate: true });
-    }
-  }, [propDefaultDate]); 
-
+  
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
@@ -66,6 +58,15 @@ export function TransactionBaseForm({ type, onSubmit, defaultDate: propDefaultDa
       date: initialDate, // Use initialDate which could be undefined until client-side effect runs
     },
   });
+
+  useEffect(() => {
+    setIsClientSide(true);
+    if (!propDefaultDate) {
+      // If no defaultDate prop, set it to current date only on client
+      form.setValue('date', new Date(), { shouldValidate: true });
+    }
+  }, [propDefaultDate, form]); 
+
   
   const categories = type === "income" ? incomeCategories : expenseCategories;
 

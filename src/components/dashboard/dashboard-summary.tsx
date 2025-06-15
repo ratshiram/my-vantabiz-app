@@ -1,4 +1,5 @@
-import { DollarSign, TrendingUp, TrendingDown, Scale } from "lucide-react";
+
+import { TrendingUp, TrendingDown, Scale } from "lucide-react";
 import { SummaryCard } from "./summary-card";
 
 interface DashboardSummaryProps {
