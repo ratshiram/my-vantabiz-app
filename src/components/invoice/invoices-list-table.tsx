@@ -42,7 +42,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
           try {
             await new Promise<void>((resolve, reject) => {
               image.onload = () => resolve();
-              image.onerror = (errEvt) => {
+              image.onerror = (errEvt: Event | string) => { // Typed errEvt
                 console.error("Image load error for PDF (list-table):", errEvt);
                 reject(new Error("Image load error for PDF generation: Failed to load logo."));
               };

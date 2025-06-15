@@ -22,7 +22,7 @@ const tiers = [
       "Limited to 5 invoices",
     ],
     cta: "Start Free Trial",
-    variant: "outline" as const,
+    variant: "outline",
     id: "free",
   },
   {
@@ -38,11 +38,11 @@ const tiers = [
       "Data export options",
     ],
     cta: "Go Pro",
-    variant: "default" as const,
+    variant: "default",
     popular: true,
     id: "pro",
   },
-];
+] as const;
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
