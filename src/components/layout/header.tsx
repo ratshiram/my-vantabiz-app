@@ -1,4 +1,6 @@
 
+import React from 'react';
+
 export function AppHeader() {
   return (
     <header className="flex flex-col items-center py-6 sm:py-8 bg-card border-b border-border">
@@ -10,6 +12,9 @@ export function AppHeader() {
           SUITE
         </p>
       </div>
+      <p className="mt-2 text-sm sm:text-md text-muted-foreground text-center">
+        Your All-in-One Business Toolkit
+      </p>
     </header>
   );
 }
