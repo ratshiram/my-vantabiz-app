@@ -5,16 +5,16 @@ import Image from 'next/image';
 export function AppHeader() {
   return (
     <header className="flex flex-col items-center py-6 sm:py-8 bg-card border-b border-border">
-      <div className="relative"> {/* Removed Tailwind height classes */}
+      <div className="relative">
         <Image
           src="/vantabizlogo.png"
           alt="VantaBiz Logo"
           width={388}
           height={145}
           priority
-          // Removed inline style forcing it to fit a container
         />
       </div>
+      <p className="mt-2 text-sm sm:text-base text-muted-foreground">Your All-in-One Business Toolkit</p>
     </header>
   );
 }
