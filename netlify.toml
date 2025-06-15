@@ -1,0 +1,19 @@
+# Netlify configuration file for Next.js projects
+
+# Build settings
+[build]
+  # Command to build your Next.js site
+  command = "npm run build"
+  
+  # Directory (relative to the root of your repo) that Netlify will publish
+  # When using @netlify/plugin-nextjs, this is usually ".netlify/outputs/"
+  publish = ".netlify/outputs/"
+
+# Environment variables (optional)
+# [build.environment]
+#   NODE_VERSION = "18" # Specify Node.js version if needed
+
+# Next.js plugin - crucial for optimal Next.js support on Netlify
+# This ensures features like server-side rendering, API routes, image optimization, etc., work correctly.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
