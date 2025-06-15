@@ -67,12 +67,31 @@ export interface InvoiceDocument {
   clientName: string;
   clientAddress: string;
   receiptNumber: string;
-  paymentDate: Date; // Stored as Firestore Timestamp
+  paymentDate: Date; // Stored as Firestore Timestamp, converted to Date on fetch
   services: Array<{ description: string; amount: number }>; // Simplified ServiceItem for storage
   subtotal: number;
   taxInfo: TaxInfo;
   totalAmount: number;
-  createdAt: Date; // Firestore Timestamp
+  createdAt: Date; // Stored as Firestore Timestamp, converted to Date on fetch
+}
+
+// This type represents the data structure when writing to Firestore, using Timestamps
+export interface InvoiceWriteData {
+  id: string;
+  userId: string;
+  businessName: string;
+  businessAddress: string;
+  taxId?: string;
+  logoUrl?: string | null;
+  clientName: string;
+  clientAddress: string;
+  receiptNumber: string;
+  paymentDate: Timestamp; // Firestore Timestamp for writing
+  services: Array<{ description: string; amount: number }>;
+  subtotal: number;
+  taxInfo: TaxInfo;
+  totalAmount: number;
+  createdAt: Timestamp; // Firestore Timestamp for writing
 }
 
 

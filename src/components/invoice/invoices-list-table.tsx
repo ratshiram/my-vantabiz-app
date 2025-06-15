@@ -33,7 +33,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
 
     if (invoice.logoUrl && typeof invoice.logoUrl === 'string' && invoice.logoUrl.trim().startsWith('data:image/')) {
       const currentLogoUrlConst: string = invoice.logoUrl; 
-      if (typeof currentLogoUrlConst === 'string') { // Additional check to satisfy stricter TS
+      if (typeof currentLogoUrlConst === 'string') { 
         const imgTypeMatch = currentLogoUrlConst.match(/^data:image\/(png|jpeg|jpg);base64,/);
         if (imgTypeMatch && imgTypeMatch[1]) {
           const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
@@ -45,7 +45,11 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
                 console.error("Image load error for PDF (list-table):", errEvt);
                 reject(new Error("Image load error for PDF generation: Failed to load logo."));
               };
-              image.src = currentLogoUrlConst; // currentLogoUrlConst is confirmed string here
+              if (typeof currentLogoUrlConst === 'string') { // Ensure it's still a string
+                image.src = currentLogoUrlConst;
+              } else {
+                reject(new Error("Logo URL is not a string.")); // Should not happen if initial checks passed
+              }
             });
 
             const logoMaxHeight = 15;
@@ -99,9 +103,9 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     }
 
 
-    doc.setFontSize(14).setFont(undefined, 'bold');
+    doc.setFontSize(14).setFont('helvetica', 'bold');
     doc.text("RECEIPT", receiptInfoX, receiptBlockY + 5, { align: 'right' });
-    doc.setFontSize(10).setFont(undefined, 'normal');
+    doc.setFontSize(10).setFont('helvetica', 'normal');
     doc.text(`#${String(invoice.receiptNumber || "")}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
     doc.text(`Date: ${format(invoice.paymentDate, "MMMM d, yyyy")}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
@@ -112,16 +116,16 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
     doc.text("BILL TO", pageMargin, currentY);
     currentY += 4;
     doc.setFontSize(10).setTextColor(0);
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text(String(invoice.clientName || ""), pageMargin, currentY);
     currentY += 5;
-    doc.setFont(undefined, 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.text(String(invoice.clientAddress || ""), pageMargin, currentY);
     currentY += 10;
 
     const tableColumn = ["Description", "Amount"];
     const tableRowsData = invoice.services.map(service => [
-      service.description,
+      String(service.description), // Ensure string
       `$${Number(service.amount).toFixed(2)}`
     ]);
 
@@ -131,7 +135,7 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
       body: tableRowsData,
       startY: mainTableStartY,
       theme: 'striped',
-      headStyles: { fillColor: [70, 128, 144] },
+      headStyles: { fillColor: [70, 128, 144] }, // Slate blue-ish
       columnStyles: {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
@@ -155,14 +159,14 @@ export function InvoicesListTable({ invoices }: InvoicesListTableProps) {
       let taxLabel = "Tax";
       if (invoice.taxInfo.option === 'ca' && invoice.taxInfo.location && typeof invoice.taxInfo.rate === 'number') {
         const rateDisplay = (invoice.taxInfo.rate * 100).toFixed(invoice.taxInfo.rate === 0.14975 ? 3 : (invoice.taxInfo.rate * 100 % 1 === 0 ? 0 : 1) );
-        taxLabel = `Tax (${invoice.taxInfo.location} @ ${rateDisplay}%)`;
+        taxLabel = `Tax (${String(invoice.taxInfo.location)} @ ${rateDisplay}%)`;
       }
       doc.text(`${String(taxLabel)}:`, totalsX, currentY, { align: 'left'});
       doc.text(`$${invoice.taxInfo.amount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
       currentY += 7;
     }
 
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text("Total Paid:", totalsX, currentY, { align: 'left'});
     doc.text(`$${invoice.totalAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
 

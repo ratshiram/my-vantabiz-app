@@ -249,9 +249,9 @@ export function InvoiceGeneratorClient() {
     }
 
 
-    doc.setFontSize(14).setFont(undefined, 'bold');
+    doc.setFontSize(14).setFont('helvetica', 'bold');
     doc.text("RECEIPT", receiptInfoX, receiptBlockY + 5, { align: 'right' });
-    doc.setFontSize(10).setFont(undefined, 'normal');
+    doc.setFontSize(10).setFont('helvetica', 'normal');
     doc.text(`#${String(receiptNumber)}`, receiptInfoX, receiptBlockY + 12, { align: 'right' });
     doc.text(`Date: ${String(formattedPaymentDate)}`, receiptInfoX, receiptBlockY + 17, { align: 'right' });
     
@@ -262,10 +262,10 @@ export function InvoiceGeneratorClient() {
     doc.text("BILL TO", pageMargin, currentY);
     currentY += 4;
     doc.setFontSize(10).setTextColor(0);
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text(String(clientName), pageMargin, currentY);
     currentY += 5;
-    doc.setFont(undefined, 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.text(String(clientAddress), pageMargin, currentY);
     currentY += 10;
 
@@ -280,7 +280,7 @@ export function InvoiceGeneratorClient() {
       body: tableRowsData,
       startY: currentY,
       theme: 'striped',
-      headStyles: { fillColor: [70, 128, 144] },
+      headStyles: { fillColor: [70, 128, 144] }, // Slate blue-ish
       columnStyles: {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
@@ -306,7 +306,7 @@ export function InvoiceGeneratorClient() {
       currentY += 7;
     }
 
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text("Total Paid:", totalsX, currentY, { align: 'left'});
     doc.text(`$${totalAmount.toFixed(2)}`, pageWidth - pageMargin, currentY, { align: 'right' });
 
@@ -374,6 +374,7 @@ export function InvoiceGeneratorClient() {
       });
     } catch (error) {
       console.error("Failed to save business info from client:", error);
+      // Toast for this error is handled within updateUserBusinessDetails in auth-context
     } finally {
       setIsSavingBusinessInfo(false);
     }
