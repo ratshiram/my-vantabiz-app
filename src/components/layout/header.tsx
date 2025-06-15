@@ -9,8 +9,8 @@ export function AppHeader() {
         <Image
           src="/vantabizlogo.png"
           alt="VantaBiz Logo"
-          width={500}
-          height={500}
+          width={388}
+          height={145}
           priority
           // Removed inline style forcing it to fit a container
         />
