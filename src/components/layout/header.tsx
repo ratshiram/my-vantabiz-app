@@ -5,14 +5,14 @@ import Image from 'next/image';
 export function AppHeader() {
   return (
     <header className="flex flex-col items-center py-6 sm:py-8 bg-card border-b border-border">
-      <div className="relative h-10 sm:h-12">
+      <div className="relative"> {/* Removed Tailwind height classes */}
         <Image
           src="/vantabizlogo.png"
           alt="VantaBiz Logo"
           width={500}
           height={500}
           priority
-          style={{ objectFit: 'contain', width: 'auto', height: '100%' }}
+          // Removed inline style forcing it to fit a container
         />
       </div>
     </header>
