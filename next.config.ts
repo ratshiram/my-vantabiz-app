@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -18,7 +19,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'image-proxy.idx.run', // Added for the new logo
+        hostname: 'image-proxy.idx.run', // Ensures this is present
         port: '',
         pathname: '/**',
       },
