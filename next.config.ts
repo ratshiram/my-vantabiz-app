@@ -17,12 +17,6 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'image-proxy.idx.run', // Kept in case other images use it, can be removed if only logo used it
-        port: '',
-        pathname: '/**',
-      },
     ],
   },
 };
