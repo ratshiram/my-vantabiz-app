@@ -1,8 +1,7 @@
 
 "use client";
 
-import type React from 'react';
-import { createContext, useState, useEffect, useCallback } from 'react';
+import React from 'react'; // Changed: Import React default
 import type { User, LoginFormValues, SignupFormValues, AuthProviderProps, UserBusinessDetails } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { 
@@ -19,7 +18,7 @@ import {
   doc, 
   setDoc, 
   getDoc,
-  updateDoc, // Added updateDoc
+  updateDoc,
   Timestamp
 } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
@@ -31,25 +30,25 @@ interface AuthContextType {
   login: (values: LoginFormValues) => Promise<void>;
   signup: (values: SignupFormValues) => Promise<void>;
   logout: () => void;
-  updateUserBusinessDetails: (details: UserBusinessDetails) => Promise<void>; // New function
+  updateUserBusinessDetails: (details: UserBusinessDetails) => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const authFirebase = getAuth(app); // Renamed to avoid potential naming conflicts
+const dbFirestore = getFirestore(app); // Renamed for clarity
 
-const auth = getAuth(app);
-const db = getFirestore(app);
+export const AuthContext = React.createContext<AuthContextType | undefined>(undefined); // Changed
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = React.useState<User | null>(null); // Changed
+  const [isLoading, setIsLoading] = React.useState(true); // Changed
   const router = useRouter();
   const { toast } = useToast();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+  React.useEffect(() => { // Changed
+    const unsubscribe = onAuthStateChanged(authFirebase, async (firebaseUser: FirebaseUser | null) => {
       setIsLoading(true);
       if (firebaseUser) {
-        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDocRef = doc(dbFirestore, "users", firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
@@ -87,7 +86,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             logoUrl: null,
           };
            setUser(newUser);
-           await setDoc(userDocRef, { 
+           await setDoc(doc(dbFirestore, "users", firebaseUser.uid), { 
              email: newUser.email, 
              name: newUser.name, 
              username: newUser.username, 
@@ -109,10 +108,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => unsubscribe();
   }, []);
 
-  const login = useCallback(async (values: LoginFormValues) => {
+  const login = React.useCallback(async (values: LoginFormValues) => { // Changed
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      await signInWithEmailAndPassword(authFirebase, values.email, values.password);
       router.push('/'); 
     } catch (error) {
       setIsLoading(false);
@@ -137,22 +136,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [router, toast]);
 
-  const signup = useCallback(async (values: SignupFormValues) => {
+  const signup = React.useCallback(async (values: SignupFormValues) => { // Changed
     setIsLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await createUserWithEmailAndPassword(authFirebase, values.email, values.password);
       const firebaseUser = userCredential.user;
       
       const trialEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      await setDoc(doc(db, "users", firebaseUser.uid), {
+      await setDoc(doc(dbFirestore, "users", firebaseUser.uid), {
         name: values.name,
         username: values.username,
         email: values.email,
         tier: 'free',
         trialEndDate: Timestamp.fromDate(trialEndDate),
         createdAt: Timestamp.now(),
-        businessName: "", // Initialize business fields
+        businessName: "", 
         businessAddress: "",
         businessTaxId: "",
         logoUrl: null,
@@ -182,10 +181,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [router, toast]);
 
-  const logout = useCallback(async () => {
+  const logout = React.useCallback(async () => { // Changed
     setIsLoading(true);
     try {
-      await signOut(auth);
+      await signOut(authFirebase);
       router.push('/login');
     } catch (error) {
         console.error("Logout failed: ", error);
@@ -195,26 +194,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
             variant: "destructive"
         });
     } finally {
-        setUser(null); // Clear user state on logout
+        setUser(null); 
         setIsLoading(false); 
     }
   }, [router, toast]);
 
-  const updateUserBusinessDetails = useCallback(async (details: UserBusinessDetails) => {
+  const updateUserBusinessDetails = React.useCallback(async (details: UserBusinessDetails) => { // Changed
     if (!user) {
       toast({ title: "Error", description: "You must be logged in to update business details.", variant: "destructive" });
       throw new Error("User not authenticated");
     }
     setIsLoading(true);
     try {
-      const userDocRef = doc(db, "users", user.id);
-      // Ensure undefined fields are handled correctly for Firestore (it removes fields if value is undefined)
-      // To clear a field, you might need to explicitly set it to null or an empty string.
+      const userDocRef = doc(dbFirestore, "users", user.id);
       const detailsToUpdate: Partial<UserBusinessDetails> = {
-        businessName: details.businessName ?? "", // Store empty string if undefined
+        businessName: details.businessName ?? "", 
         businessAddress: details.businessAddress ?? "",
         businessTaxId: details.businessTaxId ?? "",
-        logoUrl: details.logoUrl === undefined ? null : details.logoUrl, // Store null if undefined
+        logoUrl: details.logoUrl === undefined ? null : details.logoUrl, 
       };
 
       await updateDoc(userDocRef, detailsToUpdate);
