@@ -7,11 +7,10 @@ export function AppHeader() {
     <header className="text-center py-6 sm:py-8 bg-card border-b border-border">
       <div className="relative mx-auto w-auto h-12 sm:h-16" style={{ maxWidth: '200px' }}>
         <Image
-          src="https://placehold.co/150x50.png"
-          alt="VantaBiz Logo Placeholder"
+          src="/vantabizlogo.png"
+          alt="VantaBiz Logo"
           fill
           style={{ objectFit: 'contain' }}
-          data-ai-hint="logo wordmark"
           priority
         />
       </div>
