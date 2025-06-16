@@ -2,7 +2,7 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'export', // Crucial for static export for Firebase Hosting
+  output: 'standalone', // Changed for Firebase App Hosting
   // Ensure errors are caught during build, not ignored
   typescript: {
     ignoreBuildErrors: false,
@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: false,
   },
   images: {
-    unoptimized: true, // Required for static export as Firebase doesn't run Next.js image optimization
+    unoptimized: true, // May be revisited if App Hosting supports Next.js image optimization with standalone
     remotePatterns: [
       {
         protocol: 'https',
