@@ -14,6 +14,7 @@ import type { SchedulerEventFormValues, AvailabilityRule, DayOfWeek } from '@/li
 import { schedulerEventFormSchema } from '@/lib/types';
 import { PlusCircle, Trash2, Save, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
 
 const daysOfWeek: DayOfWeek[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -41,7 +42,7 @@ export function EventTypeForm({ onSubmit, existingEvent, onCancel }: EventTypeFo
     name: 'availabilityRules',
   });
 
-  useEffect(()_ => {
+  useEffect(() => {
     if (existingEvent) {
       form.reset(existingEvent);
     } else {
