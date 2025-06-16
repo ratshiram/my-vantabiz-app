@@ -2,6 +2,7 @@
 "use client";
 
 import React from 'react';
+import Image from 'next/image'; // Added for next/image
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -190,11 +191,11 @@ export function InvoiceGeneratorClient() {
       const imgTypeMatch = currentLogoUrlConst.match(/^data:image\/(png|jpeg|jpg);base64,/);
       if (imgTypeMatch && imgTypeMatch[1]) {
         const imgType = imgTypeMatch[1].toUpperCase() as 'PNG' | 'JPEG' | 'JPG';
-        const image = new Image();
+        const image = new window.Image(); // Use window.Image for browser environment
         try {
           await new Promise<void>((resolve, reject) => {
             image.onload = () => resolve();
-            image.onerror = (errEvt: Event | string) => { // Typed errEvt
+            image.onerror = (errEvt: Event | string) => { 
               console.error("Image load error for PDF (generator):", errEvt);
               reject(new Error("Image load error for PDF generation: Failed to load logo."));
             };
@@ -280,7 +281,7 @@ export function InvoiceGeneratorClient() {
       body: tableRowsData,
       startY: currentY,
       theme: 'striped',
-      headStyles: { fillColor: [70, 128, 144] }, // Slate blue-ish
+      headStyles: { fillColor: [70, 128, 144] }, 
       columnStyles: {
         0: { cellWidth: 'auto' },
         1: { halign: 'right', cellWidth: 40 }
@@ -374,7 +375,6 @@ export function InvoiceGeneratorClient() {
       });
     } catch (error) {
       console.error("Failed to save business info from client:", error);
-      // Toast for this error is handled within updateUserBusinessDetails in auth-context
     } finally {
       setIsSavingBusinessInfo(false);
     }
@@ -418,7 +418,20 @@ export function InvoiceGeneratorClient() {
                 <div><Label htmlFor="business-address">Business Address</Label><Input id="business-address" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} placeholder="Your Business Address" required /></div>
                 <div><Label htmlFor="business-tax-id">Tax ID (Optional)</Label><Input id="business-tax-id" value={businessTaxId} onChange={e => setBusinessTaxId(e.target.value)} placeholder="e.g., HST Number" /></div>
                 <div><Label htmlFor="logo-upload">Logo (Optional, max 1MB, PNG/JPEG)</Label><Input id="logo-upload" type="file" accept="image/png, image/jpeg" onChange={handleLogoUpload} className="file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"/></div>
-                {logoUrl && <div className="mt-2"><Label>Current Logo:</Label><img src={logoUrl} alt="Current business logo" className="mt-1 border rounded-md max-h-20 object-contain"/></div>}
+                {logoUrl && typeof logoUrl === 'string' && logoUrl.startsWith('data:image/') && (
+                  <div className="mt-2">
+                    <Label>Current Logo:</Label>
+                    <div className="mt-1 relative w-40 h-20 border rounded-md overflow-hidden"> {/* Container for next/image */}
+                      <Image
+                        src={logoUrl}
+                        alt="Current business logo"
+                        layout="fill"
+                        objectFit="contain"
+                        data-ai-hint="company logo"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
