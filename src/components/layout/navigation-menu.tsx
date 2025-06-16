@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, FileText, Tags, UserCircle, LogIn, UserPlus, LogOut, Settings, ListChecks } from 'lucide-react'; // Added ListChecks
+import { LayoutDashboard, FileText, Tags, UserCircle, LogIn, UserPlus, LogOut, Settings, ListChecks, CalendarClock } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import {
   DropdownMenu,
@@ -21,7 +21,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 const navItems = [
   { href: '/', label: 'FinTrack', icon: <LayoutDashboard className="mr-2 h-5 w-5" /> },
   { href: '/invoice-generator', label: 'Invoice Gen', icon: <FileText className="mr-2 h-5 w-5" /> },
-  { href: '/my-invoices', label: 'My Invoices', icon: <ListChecks className="mr-2 h-5 w-5" /> }, // New Nav Item
+  { href: '/my-invoices', label: 'My Invoices', icon: <ListChecks className="mr-2 h-5 w-5" /> },
+  { href: '/scheduler', label: 'Scheduler', icon: <CalendarClock className="mr-2 h-5 w-5" /> },
   { href: '/pricing', label: 'Pricing', icon: <Tags className="mr-2 h-5 w-5" /> },
 ];
 
@@ -32,10 +33,13 @@ export function NavigationMenu() {
   const getUserInitials = (name?: string) => {
     if (!name) return '';
     const nameParts = name.split(' ');
-    if (nameParts.length > 1) {
+    if (nameParts.length > 1 && nameParts[0] && nameParts[1]) {
       return `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase();
     }
-    return name[0].toUpperCase();
+    if (nameParts[0]) {
+      return nameParts[0][0].toUpperCase();
+    }
+    return '';
   };
 
   return (
@@ -67,7 +71,6 @@ export function NavigationMenu() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                     <Avatar className="h-9 w-9">
-                      {/* <AvatarImage src="/avatars/01.png" alt={user.name || user.email} /> */}
                       <AvatarFallback>{getUserInitials(user.name) || <UserCircle />}</AvatarFallback>
                     </Avatar>
                   </Button>
