@@ -22,7 +22,6 @@ const navItems = [
   { href: '/', label: 'FinTrack', icon: <LayoutDashboard className="mr-2 h-5 w-5" /> },
   { href: '/invoice-generator', label: 'Invoice Gen', icon: <FileText className="mr-2 h-5 w-5" /> },
   { href: '/my-invoices', label: 'My Invoices', icon: <ListChecks className="mr-2 h-5 w-5" /> },
-  { href: '/scheduler', label: 'Scheduler', icon: <CalendarClock className="mr-2 h-5 w-5" /> },
   { href: '/pricing', label: 'Pricing', icon: <Tags className="mr-2 h-5 w-5" /> },
 ];
 
